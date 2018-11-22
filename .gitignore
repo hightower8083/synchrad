@@ -1,0 +1,12 @@
+*.DS_Store
+__pycache__/
+*.pyc
+synchrad/*.DS_Store
+synchrad/__pycache__
+synchrad/*.pyc
+
+build/
+dist/
+synchrad.egg-info/
+.cache/
+.eggs/
