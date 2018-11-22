@@ -5,6 +5,7 @@
 import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
+import synchrad
 
 # Obtain the long description from README.md
 # If possible, use pypandoc to convert the README from Markdown
@@ -20,13 +21,14 @@ with open('requirements.txt') as f:
 
 setup(
     name='synchrad',
-    version=0,
+    version=synchrad.__version__,
     description='OpenCL-based lib for synchrotron radiation calculations',
     long_description=long_description,
     maintainer='Igor Andriyash',
     maintainer_email='igor.andriyash@gmail.com',
     license='GPL3',
     packages=find_packages('.'),
+    package_data={"": ['*']},
     tests_require=[],
     cmdclass={},
     install_requires=install_requires,

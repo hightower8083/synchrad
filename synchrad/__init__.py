@@ -1,1 +1,4 @@
-from .synchrad import SynchRad
+__version__ = '0.0.1'
+__doc__ = """
+synchrad
+"""

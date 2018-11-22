@@ -20,19 +20,11 @@ class SynchRad(Utilities):
 
     def calculate_spectrum(self, particleTrack, comp='all'):
         if self.Args['Mode'] == 'far':
-            self.calculate_spectrum_far(particleTrack, comp=comp)
+            particleTrack = self._track_to_device(particleTrack)
+            self._process_track( particleTrack, comp=comp )
+            self._spectr_from_device()
         else:
             raise NotImplementedError('Only far-field is available for now')
-
-
-    def calculate_spectrum_far(self, particleTrack, comp='all'):
-        if comp != 'all':
-            comps = {'x':1, 'y':2, 'z':3}
-            raise NotImplementedError('Only total field is available for now')
-        else:
-            self._process_track(  self._track_to_device(particleTrack) )
-            self._spectr_from_device()
-
 
     def _spectr_from_device(self):
         self.Data['Rad'] = self.Data['Rad'].get().T
@@ -50,7 +42,9 @@ class SynchRad(Utilities):
         particleTrack = [x, y, z, ux, uy, uz, wp]
         return particleTrack
 
-    def _process_track(self, particleTrack, return_event=False):
+    def _process_track(self, particleTrack, comp, return_event=False):
+
+        compDict = {'x':0, 'y':1, 'z':2}
 
         x, y, z, ux, uy, uz, wp = particleTrack
         spect = self.Data['Rad']
@@ -67,16 +61,21 @@ class SynchRad(Utilities):
         args_aux = [np.double(self.Args['TimeStep']), ]
 
         args = args_track + args_axes + args_res + args_aux
+        if comp is 'all':
+            evnt = self._farfield.total( self.queue, (WGS_tot, ), (WGS, ),
+                                         spect.data, *args )
+        else:
+            args = [ np.uint32(compDict[comp]), ] + args
+            evnt = self._farfield.single_component( self.queue, (WGS_tot, ),
+                                                 (WGS, ), spect.data, *args )
 
-        evnt = self._farfield.total( self.queue, (WGS_tot, ), (WGS, ),
-                              spect.data, *args )
         if return_event:
             return evnt
         else:
             evnt.wait()
 
     def _compile_kernels(self):
-        with open(src_path + "kernel_farfield_total.cl") as f:
+        with open(src_path + "kernel_farfield.cl") as f:
             farfield_src = ''.join(f.readlines())
 
         self._farfield = cl.Program(self.ctx, farfield_src).build()
@@ -151,6 +150,11 @@ class SynchRad(Utilities):
 
             self.Args['dV'] = self.Args['dw']*self.Args['dth']*self.Args['dph']
 
+
+    def reinit(self):
+        No, Nt, Np = self.Args['Grid'][-1]
+        self.Data['Rad'] = arrcl.zeros( self.queue, (Np, Nt, No),
+                                                dtype=np.double )
     def _init_data(self):
 
         self.Data = {}
