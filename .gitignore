@@ -5,6 +5,8 @@ synchrad/*.DS_Store
 synchrad/__pycache__
 synchrad/*.pyc
 
+.ipynb_checkpoints/
+example/.ipynb_checkpoints/
 build/
 dist/
 synchrad.egg-info/
