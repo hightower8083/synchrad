@@ -1,24 +1,24 @@
 // this is a kernel of far field calculation
 
 __kernel void total(
-  __global double *spectrum,
-  __global double *x,
-  __global double *y,
-  __global double *z,
-  __global double *ux,
-  __global double *uy,
-  __global double *uz,
-           double wp,
+  __global ${my_dtype} *spectrum,
+  __global ${my_dtype} *x,
+  __global ${my_dtype} *y,
+  __global ${my_dtype} *z,
+  __global ${my_dtype} *ux,
+  __global ${my_dtype} *uy,
+  __global ${my_dtype} *uz,
+           ${my_dtype} wp,
              uint nSteps,
-  __global double *omega,
-  __global double *cosTheta,
-  __global double *sinTheta,
-  __global double *cosPhi,
-  __global double *sinPhi,
+  __global ${my_dtype} *omega,
+  __global ${my_dtype} *cosTheta,
+  __global ${my_dtype} *sinTheta,
+  __global ${my_dtype} *cosPhi,
+  __global ${my_dtype} *sinPhi,
              uint nOmega,
              uint nTheta,
              uint nPhi,
-           double dt )
+           ${my_dtype} dt )
 {
   uint gti = (uint) get_global_id(0);
 
@@ -29,25 +29,25 @@ __kernel void total(
     uint iTheta = (gti - iPhi*nOmega*nTheta) / nOmega;
     uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
 
-    double omegaLocal = omega[iOmega];
-    double nVec[3] = { cosTheta[iTheta],
+    ${my_dtype} omegaLocal = omega[iOmega];
+    ${my_dtype} nVec[3] = { cosTheta[iTheta],
                        sinTheta[iTheta]*sinPhi[iPhi],
                        sinTheta[iTheta]*cosPhi[iPhi] };
 
 
-    double xLocal[3];
-    double uLocal[3];
-    double uNextLocal[3];
-    double aLocal[3];
+    ${my_dtype} xLocal[3];
+    ${my_dtype} uLocal[3];
+    ${my_dtype} uNextLocal[3];
+    ${my_dtype} aLocal[3];
 
-    double time, phase, dPhase, sinPhase, cosPhase;
-    double c1, c2, amplitude, gammaInv;
+    ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
+    ${my_dtype} c1, c2, amplitude, gammaInv;
 
-    double dtInv = 1./dt;
-    double wpdt2 = wp*dt*dt;
-    double phasePrev = 0;
-    double spectrLocalRe[3] = {0., 0., 0.};
-    double spectrLocalIm[3] = {0., 0., 0.};
+    ${my_dtype} dtInv = 1./dt;
+    ${my_dtype} wpdt2 = wp*dt*dt;
+    ${my_dtype} phasePrev = 0;
+    ${my_dtype} spectrLocalRe[3] = {0., 0., 0.};
+    ${my_dtype} spectrLocalIm[3] = {0., 0., 0.};
 
     for (uint it=0; it<nSteps-1; it++){
 
@@ -63,7 +63,7 @@ __kernel void total(
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
-      if ( dPhase < (double) M_PI) {
+      if ( dPhase < (${my_dtype}) M_PI) {
 
         uLocal[0] = ux[it];
         uNextLocal[0] = ux[it+1];
@@ -119,25 +119,25 @@ __kernel void total(
 }
 
 __kernel void single_component(
-  __global double *spectrum,
+  __global ${my_dtype} *spectrum,
              uint iComponent,
-  __global double *x,
-  __global double *y,
-  __global double *z,
-  __global double *ux,
-  __global double *uy,
-  __global double *uz,
-           double wp,
+  __global ${my_dtype} *x,
+  __global ${my_dtype} *y,
+  __global ${my_dtype} *z,
+  __global ${my_dtype} *ux,
+  __global ${my_dtype} *uy,
+  __global ${my_dtype} *uz,
+           ${my_dtype} wp,
              uint nSteps,
-  __global double *omega,
-  __global double *cosTheta,
-  __global double *sinTheta,
-  __global double *cosPhi,
-  __global double *sinPhi,
+  __global ${my_dtype} *omega,
+  __global ${my_dtype} *cosTheta,
+  __global ${my_dtype} *sinTheta,
+  __global ${my_dtype} *cosPhi,
+  __global ${my_dtype} *sinPhi,
              uint nOmega,
              uint nTheta,
              uint nPhi,
-           double dt )
+           ${my_dtype} dt )
 {
   uint gti = (uint) get_global_id(0);
 
@@ -148,24 +148,24 @@ __kernel void single_component(
     uint iTheta = (gti - iPhi*nOmega*nTheta) / nOmega;
     uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
 
-    double omegaLocal = omega[iOmega];
-    double nVec[3] = { cosTheta[iTheta],
+    ${my_dtype} omegaLocal = omega[iOmega];
+    ${my_dtype} nVec[3] = { cosTheta[iTheta],
                        sinTheta[iTheta]*sinPhi[iPhi],
                        sinTheta[iTheta]*cosPhi[iPhi] };
 
-    double xLocal[3];
-    double uLocal[3];
-    double uNextLocal[3];
-    double aLocal[3];
+    ${my_dtype} xLocal[3];
+    ${my_dtype} uLocal[3];
+    ${my_dtype} uNextLocal[3];
+    ${my_dtype} aLocal[3];
 
-    double time, phase, dPhase, sinPhase, cosPhase;
-    double c1, c2, amplitude, gammaInv;
+    ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
+    ${my_dtype} c1, c2, amplitude, gammaInv;
 
-    double dtInv = 1./dt;
-    double wpdt2 = wp*dt*dt;
-    double phasePrev = 0;
-    double spectrLocalRe = 0.0;
-    double spectrLocalIm = 0.0;
+    ${my_dtype} dtInv = 1./dt;
+    ${my_dtype} wpdt2 = wp*dt*dt;
+    ${my_dtype} phasePrev = 0;
+    ${my_dtype} spectrLocalRe = 0.0;
+    ${my_dtype} spectrLocalIm = 0.0;
 
     for (uint it=0; it<nSteps-1; it++){
 
@@ -181,7 +181,7 @@ __kernel void single_component(
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
-      if ( dPhase < (double) M_PI) {
+      if ( dPhase < (${my_dtype}) M_PI) {
 
         uLocal[0] = ux[it];
         uNextLocal[0] = ux[it+1];

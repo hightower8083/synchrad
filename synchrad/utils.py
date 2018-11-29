@@ -2,8 +2,12 @@ import numpy as np
 from scipy.constants import m_e, c, e, epsilon_0, hbar
 from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter
+
+from tvtk.api import tvtk, write_data
 
 J_in_um = 2e6*np.pi*hbar*c
+
 
 class Utilities:
 
@@ -11,9 +15,9 @@ class Utilities:
       phot_num=False, lambda0_um = None):
 
         if self.Args['Mode'] == 'far':
-            val = alpha_fs/(4*np.pi**2)*self.Data['Rad']
+            val = alpha_fs/(4*np.pi**2)*self.Data['Rad'].astype(np.double)
         elif self.Args['Mode'] == 'near' or self.Args['Mode'] == 'near-circ':
-            val = alpha_fs*np.pi/4*self.Data['Rad']
+            val = alpha_fs*np.pi/4*self.Data['Rad'].astype(np.double)
 
         if spect_filter is not None:
             val *= spect_filter
@@ -84,19 +88,19 @@ class Utilities:
           k0=k0, phot_num=phot_num, lambda0_um=lambda0_um)
 
         if self.Args['Mode'] == 'far':
-            th,ph = self.Args['theta'], self.Args['phi']
+            th, ph = self.Args['theta'], self.Args['phi']
         elif self.Args['Mode'] == 'near-circ':
-            th,ph = self.Args['R'], self.Args['phi']
+            th, ph = self.Args['R'], self.Args['phi']
         else:
             print("This function is for 'far' and 'near-circ' modes only")
 
-        ph,th = np.meshgrid(ph,th)
-        th_max = th_part*th.max()
-
+        ph, th = np.meshgrid(ph,th)
         coord = ((th*np.cos(ph)).flatten(), (th*np.sin(ph)).flatten())
 
+        th_max = th_part*th.max()
         new_coord = np.mgrid[-th_max:th_max:bins[0]*1j,-th_max:th_max:bins[1]*1j]
-        val = griddata(coord,val.flatten(),
+
+        val = griddata(coord, val.flatten(),
             (new_coord[0].flatten(), new_coord[1].flatten()),
             fill_value=0., method='linear'
           ).reshape(new_coord[0].shape)
@@ -110,3 +114,49 @@ class Utilities:
         else:
             ax = 0.5*(self.Args['omega'][1:] + self.Args['omega'][:-1])
         return ax
+
+    def exportToVTK( self, spect_filter=None, phot_num=False,\
+                     lambda0_um = None, smooth_filter=None, \
+                     filename='spectrum', project=False):
+
+        omega, theta, phi = self.Args['omega'], self.Args['theta'], self.Args['phi']
+        phi = np.r_[phi, 2*np.pi]
+
+        if project is False:
+            val = self.get_full_spectrum(spect_filter=spect_filter, \
+                        phot_num=phot_num, lambda0_um=lambda0_um)
+            scalar_name = 'spectrum'
+        else:
+            val = self.get_spot( phot_num=phot_num, lambda0_um=lambda0_um,\
+                                 spect_filter=spect_filter)
+            val = val[None, :, :]
+            omega = omega[[-1]]
+            filename += '_proj'
+            scalar_name = 'spectrum_proj'
+
+        val = np.concatenate( (val, val[:, :, [0]]), axis=-1 ).astype(self.dtype)
+
+        if smooth_filter is not None:
+            val = gaussian_filter(val, smooth_filter)
+
+        Nom = omega.size
+        Nth = theta.size
+        Nph = phi.size
+
+        omega = omega[:,None,None].astype(self.dtype)
+        theta = theta[None,:, None].astype(self.dtype)
+        phi = phi[None,None,:].astype(self.dtype)
+
+        x, y, z = (omega*np.sin(theta)*np.sin(phi)).ravel(), \
+              (omega*np.sin(theta)*np.cos(phi)).ravel(), \
+              (omega*np.cos(theta)*np.ones_like(phi)).ravel()
+
+        spc_vtk = tvtk.StructuredGrid(dimensions=(Nph, Nth, Nom), 
+                    points=np.vstack((x.ravel(),y.ravel(),z.ravel())).T)
+
+        spc_vtk.point_data.scalars = val.flatten()
+        spc_vtk.point_data.scalars.name = scalar_name
+
+        write_data(spc_vtk, filename)
+        
+    
