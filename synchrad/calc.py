@@ -18,10 +18,11 @@ class SynchRad(Utilities):
         self._init_data()
         self._compile_kernels()
 
-    def calculate_spectrum(self, particleTrack, comp='all'):
+    def calculate_spectrum(self, particleTracks, comp='all'):
         if self.Args['Mode'] == 'far':
-            particleTrack = self._track_to_device(particleTrack)
-            self._process_track( particleTrack, comp=comp )
+            for particleTrack in particleTracks:
+                particleTrack = self._track_to_device(particleTrack)
+                self._process_track( particleTrack, comp=comp )
             self._spectr_from_device()
         else:
             raise NotImplementedError('Only far-field is available for now')
