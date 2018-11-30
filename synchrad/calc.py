@@ -82,8 +82,7 @@ class SynchRad(Utilities):
             evnt.wait()
 
     def _compile_kernels(self):
-
-        agrs = {'my_dtype': self.Args['dtype']}
+        agrs = {'my_dtype': self.Args['dtype'], 'f_native':self.f_native}
         fname_far = src_path + "kernel_farfield.cl"
 
         src_far = Template( filename=fname_far ).render(**agrs)
@@ -109,11 +108,16 @@ class SynchRad(Utilities):
 
         if 'dtype' not in self.Args:
             self.Args['dtype'] = 'float'
+
+        if self.Args['dtype'] is 'float':
             self.dtype = np.single
         elif self.Args['dtype'] is 'double':
             self.dtype = np.double
-        elif self.Args['dtype'] is 'float':
-            self.dtype = np.single
+
+        if 'no_native' in self.Args:
+            self.f_native = ''
+        else:
+            self.f_native = 'native_'
 
         if 'TimeStep' not in self.Args.keys():
             raise KeyError("TimeStep must be defined.")

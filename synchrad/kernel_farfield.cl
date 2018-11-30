@@ -1,5 +1,7 @@
 // kernels of far field calculation (total and single component)
 
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+
 __kernel void total(
   __global ${my_dtype} *spectrum,
   __global ${my_dtype} *x,
@@ -30,91 +32,64 @@ __kernel void total(
     uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
 
     ${my_dtype} omegaLocal = omega[iOmega];
-    ${my_dtype} nVec[3] = { cosTheta[iTheta],
+    ${my_dtype}3 nVec = (${my_dtype}3) { cosTheta[iTheta],
                        sinTheta[iTheta]*sinPhi[iPhi],
                        sinTheta[iTheta]*cosPhi[iPhi] };
 
 
-    ${my_dtype} xLocal[3];
-    ${my_dtype} uLocal[3];
-    ${my_dtype} uNextLocal[3];
-    ${my_dtype} aLocal[3];
+    ${my_dtype}3 xLocal;
+    ${my_dtype}3 uLocal;
+    ${my_dtype}3 uNextLocal;
+    ${my_dtype}3 aLocal;
+    ${my_dtype}3 amplitude;
 
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
-    ${my_dtype} c1, c2, amplitude, gammaInv;
+    ${my_dtype} c1, c2, gammaInv;
 
-    ${my_dtype} dtInv = 1./dt;
-    ${my_dtype} wpdt2 = wp*dt*dt;
-    ${my_dtype} phasePrev = 0;
-    ${my_dtype} spectrLocalRe[3] = {0., 0., 0.};
-    ${my_dtype} spectrLocalIm[3] = {0., 0., 0.};
+    ${my_dtype} dtInv = (${my_dtype}) 1./dt;
+    ${my_dtype} wpdt2 =(${my_dtype}) wp*dt*dt;
+    ${my_dtype} phasePrev = (${my_dtype}) 0.0;
+    ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
+    ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
 
     for (uint it=0; it<nSteps-1; it++){
 
-      time = it * dt;
+      time = (${my_dtype}) (it * dt);
+      xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
-      xLocal[0] = x[it];
-      xLocal[1] = y[it];
-      xLocal[2] = z[it];
-
-      phase = omegaLocal * ( time - xLocal[0]*nVec[0]
-                                  - xLocal[1]*nVec[1]
-                                  - xLocal[2]*nVec[2] );
+      phase = omegaLocal * ( time - dot(xLocal, nVec)) ;
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
       if ( dPhase < (${my_dtype}) M_PI) {
 
-        uLocal[0] = ux[it];
-        uNextLocal[0] = ux[it+1];
+        uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
+        uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
 
-        uLocal[1] = uy[it];
-        uNextLocal[1] = uy[it+1];
+        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uLocal, uLocal) );
+        uLocal *= gammaInv;
+        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uNextLocal, uNextLocal) );
+        uNextLocal *= gammaInv;
 
-        uLocal[2] = uz[it];
-        uNextLocal[2] = uz[it+1];
+        aLocal = (uNextLocal-uLocal) * dtInv;
+        uLocal = ${my_dtype}(0.5) * (uNextLocal+uLocal);
 
-        gammaInv = rsqrt( 1. + uLocal[0]*uLocal[0]
-                             + uLocal[1]*uLocal[1]
-                             + uLocal[2]*uLocal[2] );
+        c1 = dot(aLocal, nVec);
+        c2 = ${my_dtype}(1.) - dot(uLocal, nVec);
 
-        for (uint i=0; i<3; i++){
-          uLocal[i] = uLocal[i] * gammaInv;
-        }
-
-        gammaInv = rsqrt( 1. + uNextLocal[0]*uNextLocal[0]
-                             + uNextLocal[1]*uNextLocal[1]
-                             + uNextLocal[2]*uNextLocal[2] );
-
-        for (uint i=0; i<3; i++){
-          uNextLocal[i] = uNextLocal[i] * gammaInv;
-          aLocal[i] = ( uNextLocal[i] - uLocal[i] ) * dtInv;
-          uLocal[i] = 0.5 * ( uLocal[i] + uNextLocal[i] );
-        }
-
-        c1 = aLocal[0]*nVec[0] + aLocal[1]*nVec[1] + aLocal[2]*nVec[2];
-        c2 = 1.0 - uLocal[0]*nVec[0] - uLocal[1]*nVec[1] - uLocal[2]*nVec[2];
-
-        c2 = 1.0/c2;
+        c2 =  ${my_dtype}(1.) / c2;
         c1 = c1*c2*c2;
 
-        sinPhase = sin(phase);
-        cosPhase = cos(phase);
+        sinPhase = ${f_native}sin(phase);
+        cosPhase = ${f_native}cos(phase);
 
-        for (uint i=0; i<3; i++){
-          amplitude = c1*( nVec[i]-uLocal[i] ) - c2*aLocal[i];
-          spectrLocalRe[i] += amplitude * cosPhase;
-          spectrLocalIm[i] += amplitude * sinPhase;
-        }
+        amplitude = c1*( nVec-uLocal ) - c2*aLocal;
+        spectrLocalRe += amplitude* cosPhase;
+        spectrLocalIm += amplitude* sinPhase;
       }
     }
 
-    spectrum[gti] +=  wpdt2 * ( spectrLocalRe[0]*spectrLocalRe[0]
-                              + spectrLocalIm[0]*spectrLocalIm[0]
-                              + spectrLocalRe[1]*spectrLocalRe[1]
-                              + spectrLocalIm[1]*spectrLocalIm[1]
-                              + spectrLocalRe[2]*spectrLocalRe[2]
-                              + spectrLocalIm[2]*spectrLocalIm[2] );
+    spectrum[gti] +=  wpdt2 * ( dot(spectrLocalRe, spectrLocalRe) + dot(spectrLocalIm, spectrLocalIm) );
    }
 }
 
@@ -149,83 +124,63 @@ __kernel void single_component(
     uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
 
     ${my_dtype} omegaLocal = omega[iOmega];
-    ${my_dtype} nVec[3] = { cosTheta[iTheta],
+    ${my_dtype}3 nVec = (${my_dtype}3) { cosTheta[iTheta],
                        sinTheta[iTheta]*sinPhi[iPhi],
                        sinTheta[iTheta]*cosPhi[iPhi] };
 
-    ${my_dtype} xLocal[3];
-    ${my_dtype} uLocal[3];
-    ${my_dtype} uNextLocal[3];
-    ${my_dtype} aLocal[3];
+
+    ${my_dtype}3 xLocal;
+    ${my_dtype}3 uLocal;
+    ${my_dtype}3 uNextLocal;
+    ${my_dtype}3 aLocal;
+    ${my_dtype} amplitude;
 
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
-    ${my_dtype} c1, c2, amplitude, gammaInv;
+    ${my_dtype} c1, c2, gammaInv;
 
     ${my_dtype} dtInv = 1./dt;
     ${my_dtype} wpdt2 = wp*dt*dt;
     ${my_dtype} phasePrev = 0;
-    ${my_dtype} spectrLocalRe = 0.0;
-    ${my_dtype} spectrLocalIm = 0.0;
+    ${my_dtype} spectrLocalRe = (${my_dtype}) 0.0;
+    ${my_dtype} spectrLocalIm = (${my_dtype}) 0.0;
 
     for (uint it=0; it<nSteps-1; it++){
 
       time = it * dt;
+      xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
-      xLocal[0] = x[it];
-      xLocal[1] = y[it];
-      xLocal[2] = z[it];
-
-      phase = omegaLocal * ( time - xLocal[0]*nVec[0]
-                                  - xLocal[1]*nVec[1]
-                                  - xLocal[2]*nVec[2] );
+      phase = omegaLocal * ( time - dot(xLocal, nVec)) ;
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
       if ( dPhase < (${my_dtype}) M_PI) {
 
-        uLocal[0] = ux[it];
-        uNextLocal[0] = ux[it+1];
+        uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
+        uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
 
-        uLocal[1] = uy[it];
-        uNextLocal[1] = uy[it+1];
+        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uLocal, uLocal) );
+        uLocal *= gammaInv;
+        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uNextLocal, uNextLocal) );
+        uNextLocal *= gammaInv;
 
-        uLocal[2] = uz[it];
-        uNextLocal[2] = uz[it+1];
+        aLocal = (uNextLocal-uLocal) * dtInv;
+        uLocal = ${my_dtype}(0.5) * (uNextLocal+uLocal);
 
-        gammaInv = rsqrt( 1. + uLocal[0]*uLocal[0]
-                             + uLocal[1]*uLocal[1]
-                             + uLocal[2]*uLocal[2] );
+        c1 = dot(aLocal, nVec);
+        c2 = ${my_dtype}(1.) - dot(uLocal, nVec);
 
-        for (uint i=0; i<3; i++){
-          uLocal[i] = uLocal[i] * gammaInv;
-        }
-
-        gammaInv = rsqrt( 1. + uNextLocal[0]*uNextLocal[0]
-                             + uNextLocal[1]*uNextLocal[1]
-                             + uNextLocal[2]*uNextLocal[2] );
-
-        for (uint i=0; i<3; i++){
-          uNextLocal[i] = uNextLocal[i] * gammaInv;
-          aLocal[i] = ( uNextLocal[i] - uLocal[i] ) * dtInv;
-          uLocal[i] = 0.5 * ( uLocal[i] + uNextLocal[i] );
-        }
-
-        c1 = aLocal[0]*nVec[0] + aLocal[1]*nVec[1] + aLocal[2]*nVec[2];
-        c2 = 1.0 - uLocal[0]*nVec[0] - uLocal[1]*nVec[1] - uLocal[2]*nVec[2];
-
-        c2 = 1.0/c2;
+        c2 = ${my_dtype}(1.)/c2;
         c1 = c1*c2*c2;
 
-        sinPhase = sin(phase);
-        cosPhase = cos(phase);
+        sinPhase = ${f_native}sin(phase);
+        cosPhase = ${f_native}cos(phase);
 
-        amplitude = c1 * ( nVec[iComponent]-uLocal[iComponent] ) - c2*aLocal[iComponent];
-        spectrLocalRe += amplitude * cosPhase;
-        spectrLocalIm += amplitude * sinPhase;
+        amplitude = c1*( nVec[iComponent]-uLocal[iComponent] ) - c2*aLocal[iComponent];
+        spectrLocalRe += amplitude* cosPhase;
+        spectrLocalIm += amplitude* sinPhase;
       }
     }
 
-    spectrum[gti] +=  wpdt2 * ( spectrLocalRe*spectrLocalRe
-                              + spectrLocalIm*spectrLocalIm );
+    spectrum[gti] +=  wpdt2 * ( spectrLocalRe*spectrLocalRe + spectrLocalIm*spectrLocalIm );
    }
 }
