@@ -1,4 +1,4 @@
-// this is a kernel of far field calculation
+// kernels of far field calculation (total and single component)
 
 __kernel void total(
   __global ${my_dtype} *spectrum,
@@ -74,17 +74,17 @@ __kernel void total(
         uLocal[2] = uz[it];
         uNextLocal[2] = uz[it+1];
 
-        gammaInv = 1. / sqrt( 1. + uLocal[0]*uLocal[0]
-                                 + uLocal[1]*uLocal[1]
-                                 + uLocal[2]*uLocal[2] );
+        gammaInv = rsqrt( 1. + uLocal[0]*uLocal[0]
+                             + uLocal[1]*uLocal[1]
+                             + uLocal[2]*uLocal[2] );
 
         for (uint i=0; i<3; i++){
           uLocal[i] = uLocal[i] * gammaInv;
         }
 
-        gammaInv = 1. / sqrt( 1. + uNextLocal[0]*uNextLocal[0]
-                                 + uNextLocal[1]*uNextLocal[1]
-                                 + uNextLocal[2]*uNextLocal[2] );
+        gammaInv = rsqrt( 1. + uNextLocal[0]*uNextLocal[0]
+                             + uNextLocal[1]*uNextLocal[1]
+                             + uNextLocal[2]*uNextLocal[2] );
 
         for (uint i=0; i<3; i++){
           uNextLocal[i] = uNextLocal[i] * gammaInv;
@@ -192,17 +192,17 @@ __kernel void single_component(
         uLocal[2] = uz[it];
         uNextLocal[2] = uz[it+1];
 
-        gammaInv = 1. / sqrt( 1. + uLocal[0]*uLocal[0]
-                                 + uLocal[1]*uLocal[1]
-                                 + uLocal[2]*uLocal[2] );
+        gammaInv = rsqrt( 1. + uLocal[0]*uLocal[0]
+                             + uLocal[1]*uLocal[1]
+                             + uLocal[2]*uLocal[2] );
 
         for (uint i=0; i<3; i++){
           uLocal[i] = uLocal[i] * gammaInv;
         }
 
-        gammaInv = 1. / sqrt( 1. + uNextLocal[0]*uNextLocal[0]
-                                 + uNextLocal[1]*uNextLocal[1]
-                                 + uNextLocal[2]*uNextLocal[2] );
+        gammaInv = rsqrt( 1. + uNextLocal[0]*uNextLocal[0]
+                             + uNextLocal[1]*uNextLocal[1]
+                             + uNextLocal[2]*uNextLocal[2] );
 
         for (uint i=0; i<3; i++){
           uNextLocal[i] = uNextLocal[i] * gammaInv;
@@ -219,7 +219,7 @@ __kernel void single_component(
         sinPhase = sin(phase);
         cosPhase = cos(phase);
 
-        amplitude = c1*( nVec[iComponent]-uLocal[iComponent] ) - c2*aLocal[iComponent];
+        amplitude = c1 * ( nVec[iComponent]-uLocal[iComponent] ) - c2*aLocal[iComponent];
         spectrLocalRe += amplitude * cosPhase;
         spectrLocalIm += amplitude * sinPhase;
       }
