@@ -20,7 +20,7 @@ class SynchRad(Utilities):
         self._compile_kernels()
 
     def calculate_spectrum(self, particleTracks, comp='all'):
-        if self.Args['Mode'] == 'far':
+        if self.Args['mode'] == 'far':
             for particleTrack in particleTracks:
                 particleTrack = self._track_to_device(particleTrack)
                 self._process_track( particleTrack, comp=comp )
@@ -29,7 +29,7 @@ class SynchRad(Utilities):
             raise NotImplementedError('Only far-field is available for now')
 
     def _spectr_from_device(self):
-        self.Data['Rad'] = self.Data['Rad'].get().T
+        self.Data['radiation'] = self.Data['radiation'].get().T
 
     def _track_to_device(self, particleTrack):
         x, y, z, ux, uy, uz, wp = particleTrack
@@ -54,9 +54,9 @@ class SynchRad(Utilities):
         compDict = {'x':0, 'y':1, 'z':2}
 
         x, y, z, ux, uy, uz, wp = particleTrack
-        spect = self.Data['Rad']
+        spect = self.Data['radiation']
         WGS, WGS_tot = self._get_wgs(self.Args['numGridNodes'])
-        No, Nt, Np = self.Args['Grid'][-1]
+        No, Nt, Np = self.Args['grid'][-1]
 
         args_track = [coord.data for coord in (x, y, z, ux, uy, uz)]
         args_track += [ wp, np.uint32(x.size) ]
@@ -65,7 +65,7 @@ class SynchRad(Utilities):
         for name in ('omega', 'cosTheta', 'sinTheta', 'cosPhi', 'sinPhi'):
             args_axes.append( self.Data[name].data )
         args_res = [np.uint32(Nn) for Nn in (No, Nt, Np)]
-        args_aux = [self.dtype(self.Args['TimeStep']), ]
+        args_aux = [self.dtype(self.Args['timeStep']), ]
 
         args = args_track + args_axes + args_res + args_aux
         if comp is 'all':
@@ -82,18 +82,25 @@ class SynchRad(Utilities):
             evnt.wait()
 
     def _compile_kernels(self):
+
         agrs = {'my_dtype': self.Args['dtype'], 'f_native':self.f_native}
         fname_far = src_path + "kernel_farfield.cl"
 
         src_far = Template( filename=fname_far ).render(**agrs)
 
-        self._farfield = cl.Program(self.ctx, src_far).build()
+        compiler_options = []
+        # can be set to  `['-cl-fast-relaxed-math',]` but is probably
+        # usless in most cases
+        self._farfield = cl.Program(self.ctx, src_far)\
+            .build(options=compiler_options)
 
     def _set_global_working_group_size(self):
         if self.dev_type=='CPU':
             self.WGS = 32
         else:
-            self.WGS = 256 #self.ctx.devices[0].max_work_group_size
+            self.WGS = 256
+            # should be `self.ctx.devices[0].max_work_group_size`, but
+            # fails for some implementations
 
     def _get_wgs(self, Nelem):
         if Nelem <= self.WGS:
@@ -119,8 +126,8 @@ class SynchRad(Utilities):
         else:
             self.f_native = 'native_'
 
-        if 'TimeStep' not in self.Args.keys():
-            raise KeyError("TimeStep must be defined.")
+        if 'timeStep' not in self.Args.keys():
+            raise KeyError("timeStep must be defined.")
 
         if 'ctx' not in self.Args.keys():
             self.Args['ctx'] = None
@@ -128,13 +135,13 @@ class SynchRad(Utilities):
         if 'Features' not in self.Args.keys():
             self.Args['Features'] = {}
 
-        if 'Mode' not in self.Args.keys():
-            self.Args['Mode'] = 'far'
-        elif self.Args['Mode'] != 'far':
+        if 'mode' not in self.Args.keys():
+            self.Args['mode'] = 'far'
+        elif self.Args['mode'] != 'far':
             raise NotImplementedError('Only far-field is available for now')
 
-        omega_min, omega_max = self.Args['Grid'][0]
-        No, Nt, Np = self.Args['Grid'][-1]
+        omega_min, omega_max = self.Args['grid'][0]
+        No, Nt, Np = self.Args['grid'][-1]
 
         self.Args['numGridNodes'] = No * Nt * Np
 
@@ -151,9 +158,9 @@ class SynchRad(Utilities):
         else:
             self.Args['dw'] = np.array([1.,], dtype=self.dtype)
 
-        if self.Args['Mode'] == 'far':
-            theta_min, theta_max  = self.Args['Grid'][1]
-            phi_min, phi_max = self.Args['Grid'][2]
+        if self.Args['mode'] == 'far':
+            theta_min, theta_max  = self.Args['grid'][1]
+            phi_min, phi_max = self.Args['grid'][2]
 
             theta = np.r_[theta_min:theta_max:Nt*1j]
             phi = phi_min + (phi_max-phi_min)/Np*np.arange(Np)
@@ -175,21 +182,21 @@ class SynchRad(Utilities):
 
 
     def reinit(self):
-        No, Nt, Np = self.Args['Grid'][-1]
-        self.Data['Rad'] = arrcl.zeros( self.queue, (Np, Nt, No),
+        No, Nt, Np = self.Args['grid'][-1]
+        self.Data['radiation'] = arrcl.zeros( self.queue, (Np, Nt, No),
                                         dtype=self.dtype )
     def _init_data(self):
 
         self.Data = {}
 
-        No, Nt, Np = self.Args['Grid'][-1]
-        self.Data['Rad'] = arrcl.zeros( self.queue, (Np, Nt, No),
+        No, Nt, Np = self.Args['grid'][-1]
+        self.Data['radiation'] = arrcl.zeros( self.queue, (Np, Nt, No),
                                                 dtype=self.dtype )
 
         self.Data['omega'] = arrcl.to_device( self.queue,
                                      2*np.pi*self.Args['omega'] )
 
-        if self.Args['Mode'] == 'far':
+        if self.Args['mode'] == 'far':
             self.Data['cosTheta'] = arrcl.to_device( self.queue,
                                         np.cos(self.Args['theta']) )
             self.Data['sinTheta'] = arrcl.to_device( self.queue,
