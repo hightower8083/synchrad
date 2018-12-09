@@ -16,7 +16,7 @@ class Utilities:
 
         if self.Args['mode'] == 'far':
             val = alpha_fs/(4*np.pi**2)*self.Data['radiation'].astype(np.double)
-        elif self.Args['mode'] == 'near' or self.Args['mode'] == 'near-circ':
+        elif self.Args['mode'] == 'near2D' or self.Args['mode'] == 'near':
             val = alpha_fs*np.pi/4*self.Data['radiation'].astype(np.double)
 
         if spect_filter is not None:
@@ -44,12 +44,12 @@ class Utilities:
         if self.Args['mode'] == 'far':
             val = 0.5*self.Args['dth']*self.Args['dph']*( (val[1:] + val[:-1]) \
               *np.sin(self.Args['theta'][None,:,None]) ).sum(-1).sum(-1)
-        elif self.Args['mode'] == 'near':
+        elif self.Args['mode'] == 'near2D':
             val = 0.5*self.Args['dx']*self.Args['dy'] \
                   *(val[1:] + val[:-1]).sum(-1).sum(-1)
-        elif self.Args['mode'] == 'near-circ':
+        elif self.Args['mode'] == 'near':
             val = 0.5*self.Args['dr']*self.Args['dph']*( (val[1:] + val[:-1]) \
-              *self.Args['R'][None,:,None] ).sum(-1).sum(-1)
+              *self.Args['radius'][None,:,None] ).sum(-1).sum(-1)
 
         return val
 
@@ -89,10 +89,10 @@ class Utilities:
 
         if self.Args['mode'] == 'far':
             th, ph = self.Args['theta'], self.Args['phi']
-        elif self.Args['mode'] == 'near-circ':
-            th, ph = self.Args['R'], self.Args['phi']
+        elif self.Args['mode'] == 'near':
+            th, ph = self.Args['radius'], self.Args['phi']
         else:
-            print("This function is for 'far' and 'near-circ' modes only")
+            print("This function is for 'far' and 'near' modes only")
 
         ph, th = np.meshgrid(ph,th)
         coord = ((th*np.cos(ph)).flatten(), (th*np.sin(ph)).flatten())

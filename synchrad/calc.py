@@ -20,13 +20,11 @@ class SynchRad(Utilities):
         self._compile_kernels()
 
     def calculate_spectrum(self, particleTracks, comp='all'):
-        if self.Args['mode'] == 'far':
-            for particleTrack in particleTracks:
-                particleTrack = self._track_to_device(particleTrack)
-                self._process_track( particleTrack, comp=comp )
-            self._spectr_from_device()
-        else:
-            raise NotImplementedError('Only far-field is available for now')
+
+        for particleTrack in particleTracks:
+            particleTrack = self._track_to_device(particleTrack)
+            self._process_track( particleTrack, comp=comp )
+        self._spectr_from_device()
 
     def _spectr_from_device(self):
         self.Data['radiation'] = self.Data['radiation'].get().T
@@ -56,43 +54,50 @@ class SynchRad(Utilities):
         x, y, z, ux, uy, uz, wp = particleTrack
         spect = self.Data['radiation']
         WGS, WGS_tot = self._get_wgs(self.Args['numGridNodes'])
-        No, Nt, Np = self.Args['grid'][-1]
 
         args_track = [coord.data for coord in (x, y, z, ux, uy, uz)]
         args_track += [ wp, np.uint32(x.size) ]
 
-        args_axes = []
-        for name in ('omega', 'cosTheta', 'sinTheta', 'cosPhi', 'sinPhi'):
-            args_axes.append( self.Data[name].data )
-        args_res = [np.uint32(Nn) for Nn in (No, Nt, Np)]
+        if self.Args['mode'] is 'far':
+            axs_str = ('omega', 'sinTheta', 'cosTheta', 'sinPhi', 'cosPhi')
+        elif self.Args['mode'] is 'near':
+            axs_str = ('omega', 'radius', 'sinPhi', 'cosPhi')
+
+        args_axes = [self.Data[name].data for name in axs_str]
+
+        if self.Args['mode'] is 'near':
+            args_axes += [ self.dtype(self.Args['grid'][3]), ]
+
+        args_res = [np.uint32(Nn) for Nn in self.Args['grid'][-1]]
         args_aux = [self.dtype(self.Args['timeStep']), ]
 
         args = args_track + args_axes + args_res + args_aux
+
         if comp is 'all':
-            evnt = self._farfield.total( self.queue, (WGS_tot, ), (WGS, ),
+            event = self._mapper.total( self.queue, (WGS_tot, ), (WGS, ),
                                          spect.data, *args )
         else:
             args = [ np.uint32(compDict[comp]), ] + args
-            evnt = self._farfield.single_component( self.queue, (WGS_tot, ),
-                                                 (WGS, ), spect.data, *args )
+            event = self._mapper.component( self.queue, (WGS_tot, ),
+                                            (WGS, ), spect.data, *args )
 
         if return_event:
-            return evnt
+            return event
         else:
-            evnt.wait()
+            event.wait()
 
     def _compile_kernels(self):
 
         agrs = {'my_dtype': self.Args['dtype'], 'f_native':self.f_native}
-        fname_far = src_path + "kernel_farfield.cl"
 
-        src_far = Template( filename=fname_far ).render(**agrs)
+        fname = src_path
+        if self.Args['mode'] is 'far':
+            fname += "kernel_farfield.cl"
+        elif self.Args['mode'] is 'near':
+            fname += "kernel_nearfield.cl"
 
-        compiler_options = []
-        # can be set to  `['-cl-fast-relaxed-math',]` but is probably
-        # usless in most cases
-        self._farfield = cl.Program(self.ctx, src_far)\
-            .build(options=compiler_options)
+        src = Template( filename=fname ).render(**agrs)
+        self._mapper = cl.Program(self.ctx, src).build()
 
     def _set_global_working_group_size(self):
         if self.dev_type=='CPU':
@@ -137,14 +142,13 @@ class SynchRad(Utilities):
 
         if 'mode' not in self.Args.keys():
             self.Args['mode'] = 'far'
-        elif self.Args['mode'] != 'far':
-            raise NotImplementedError('Only far-field is available for now')
+
+        gridNodeNums = self.Args['grid'][-1]
+
+        self.Args['numGridNodes'] = int(np.prod(gridNodeNums))
 
         omega_min, omega_max = self.Args['grid'][0]
-        No, Nt, Np = self.Args['grid'][-1]
-
-        self.Args['numGridNodes'] = No * Nt * Np
-
+        No = gridNodeNums[0]
         if 'wavelengthGrid' in self.Args['Features']:
             self.Args['wavelengths'] = np.r_[1./omega_max:1./omega_min:No*1j]
             omega = 1./self.Args['wavelengths']
@@ -159,14 +163,12 @@ class SynchRad(Utilities):
             self.Args['dw'] = np.array([1.,], dtype=self.dtype)
 
         if self.Args['mode'] == 'far':
+            Nt, Np = gridNodeNums[1:]
             theta_min, theta_max  = self.Args['grid'][1]
             phi_min, phi_max = self.Args['grid'][2]
 
             theta = np.r_[theta_min:theta_max:Nt*1j]
             phi = phi_min + (phi_max-phi_min)/Np*np.arange(Np)
-
-            self.Args['theta'] = theta.astype(self.dtype)
-            self.Args['phi'] = phi.astype(self.dtype)
 
             if Nt>1:
                 self.Args['dth'] = theta[1] - theta[0]
@@ -178,34 +180,64 @@ class SynchRad(Utilities):
             else:
                 self.Args['dph'] = self.dtype(1.)
 
+            self.Args['theta'] = theta.astype(self.dtype)
+            self.Args['phi'] = phi.astype(self.dtype)
             self.Args['dV'] = self.Args['dw']*self.Args['dth']*self.Args['dph']
 
+        elif self.Args['mode'] == 'near':
+            Nr, Np = gridNodeNums[1:]
+
+            r_min, r_max  = self.Args['grid'][1]
+            phi_min, phi_max = self.Args['grid'][2]
+
+            radius = np.r_[r_min:r_max:Nr*1j]
+            phi = phi_min + (phi_max-phi_min)/Np*np.arange(Np)
+
+            if Nr>1:
+                self.Args['dr'] = radius[1] - radius[0]
+            else:
+                self.Args['dr'] = 1.
+
+            if Np>1:
+                self.Args['dph'] = phi[1] - phi[0]
+            else:
+                self.Args['dph'] = 1.
+
+            self.Args['phi'] = phi.astype(self.dtype)
+            self.Args['radius'] = radius.astype(self.dtype)
+            self.Args['dV'] = self.Args['dw']*self.Args['dr']*self.Args['dph']
 
     def reinit(self):
-        No, Nt, Np = self.Args['grid'][-1]
-        self.Data['radiation'] = arrcl.zeros( self.queue, (Np, Nt, No),
-                                        dtype=self.dtype )
+        gridNodeNums = tuple(self.Args['grid'][-1][::-1])
+        self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
+                                              dtype=self.dtype )
     def _init_data(self):
 
         self.Data = {}
 
-        No, Nt, Np = self.Args['grid'][-1]
-        self.Data['radiation'] = arrcl.zeros( self.queue, (Np, Nt, No),
+        gridNodeNums = tuple(self.Args['grid'][-1][::-1])
+        self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
                                                 dtype=self.dtype )
 
         self.Data['omega'] = arrcl.to_device( self.queue,
-                                     2*np.pi*self.Args['omega'] )
+                                 self.dtype(2*np.pi)*self.Args['omega'] )
 
-        if self.Args['mode'] == 'far':
-            self.Data['cosTheta'] = arrcl.to_device( self.queue,
-                                        np.cos(self.Args['theta']) )
+        if self.Args['mode'] is 'far':
             self.Data['sinTheta'] = arrcl.to_device( self.queue,
-                                        np.sin(self.Args['theta']) )
-            self.Data['cosPhi'] = arrcl.to_device( self.queue,
-                                        np.cos(self.Args['phi']) )
+                                                 np.sin(self.Args['theta']) )
+            self.Data['cosTheta'] = arrcl.to_device( self.queue,
+                                                 np.cos(self.Args['theta']) )
             self.Data['sinPhi'] = arrcl.to_device( self.queue,
-                                        np.sin(self.Args['phi']) )
-
+                                                   np.sin(self.Args['phi']) )
+            self.Data['cosPhi'] = arrcl.to_device( self.queue,
+                                                   np.cos(self.Args['phi']) )
+        elif self.Args['mode'] is 'near':
+            self.Data['radius'] = arrcl.to_device( self.queue,
+                                                   self.Args['radius'] )
+            self.Data['sinPhi'] = arrcl.to_device( self.queue,
+                                                   np.sin(self.Args['phi']) )
+            self.Data['cosPhi'] = arrcl.to_device( self.queue,
+                                                   np.cos(self.Args['phi']) )
     def _init_comm(self):
 
         ctx_kw_args = {}

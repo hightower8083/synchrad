@@ -13,10 +13,10 @@ __kernel void total(
            ${my_dtype} wp,
              uint nSteps,
   __global ${my_dtype} *omega,
-  __global ${my_dtype} *cosTheta,
   __global ${my_dtype} *sinTheta,
-  __global ${my_dtype} *cosPhi,
+  __global ${my_dtype} *cosTheta,
   __global ${my_dtype} *sinPhi,
+  __global ${my_dtype} *cosPhi,
              uint nOmega,
              uint nTheta,
              uint nPhi,
@@ -32,10 +32,10 @@ __kernel void total(
     uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
 
     ${my_dtype} omegaLocal = omega[iOmega];
-    ${my_dtype}3 nVec = (${my_dtype}3) { cosTheta[iTheta],
+    ${my_dtype}3 nVec = (${my_dtype}3) {
+                       cosTheta[iTheta],
                        sinTheta[iTheta]*sinPhi[iPhi],
                        sinTheta[iTheta]*cosPhi[iPhi] };
-
 
     ${my_dtype}3 xLocal;
     ${my_dtype}3 uLocal;
@@ -46,9 +46,9 @@ __kernel void total(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
     ${my_dtype} c1, c2, gammaInv;
 
-    ${my_dtype} dtInv = (${my_dtype}) 1./dt;
-    ${my_dtype} wpdt2 =(${my_dtype}) wp*dt*dt;
-    ${my_dtype} phasePrev = (${my_dtype}) 0.0;
+    ${my_dtype} dtInv = ${my_dtype}(1.)/dt;
+    ${my_dtype} wpdt2 =  wp * dt*dt;
+    ${my_dtype} phasePrev = ${my_dtype}(0.);
     ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
     ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
 
@@ -61,7 +61,7 @@ __kernel void total(
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
-      if ( dPhase < (${my_dtype}) M_PI) {
+      if ( dPhase < ${my_dtype}(M_PI) ) {
 
         uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
         uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
@@ -93,7 +93,7 @@ __kernel void total(
    }
 }
 
-__kernel void single_component(
+__kernel void component(
   __global ${my_dtype} *spectrum,
              uint iComponent,
   __global ${my_dtype} *x,
@@ -105,10 +105,10 @@ __kernel void single_component(
            ${my_dtype} wp,
              uint nSteps,
   __global ${my_dtype} *omega,
-  __global ${my_dtype} *cosTheta,
   __global ${my_dtype} *sinTheta,
-  __global ${my_dtype} *cosPhi,
+  __global ${my_dtype} *cosTheta,
   __global ${my_dtype} *sinPhi,
+  __global ${my_dtype} *cosPhi,
              uint nOmega,
              uint nTheta,
              uint nPhi,
@@ -138,11 +138,11 @@ __kernel void single_component(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
     ${my_dtype} c1, c2, gammaInv;
 
-    ${my_dtype} dtInv = 1./dt;
+    ${my_dtype} dtInv = ${my_dtype}(1.)/dt;
     ${my_dtype} wpdt2 = wp*dt*dt;
-    ${my_dtype} phasePrev = 0;
-    ${my_dtype} spectrLocalRe = (${my_dtype}) 0.0;
-    ${my_dtype} spectrLocalIm = (${my_dtype}) 0.0;
+    ${my_dtype} phasePrev = ${my_dtype}(0.);
+    ${my_dtype} spectrLocalRe = ${my_dtype}(0.);
+    ${my_dtype} spectrLocalIm = ${my_dtype}(0.);
 
     for (uint it=0; it<nSteps-1; it++){
 
@@ -153,7 +153,7 @@ __kernel void single_component(
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
-      if ( dPhase < (${my_dtype}) M_PI) {
+      if ( dPhase < ${my_dtype}(M_PI) ) {
 
         uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
         uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
