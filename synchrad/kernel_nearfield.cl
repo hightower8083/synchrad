@@ -37,36 +37,36 @@ __kernel void total(
                                                   radius[iRadius]*cosPhi[iPhi] };
 
     ${my_dtype}3 nVec, uLocal, uNextLocal;
-    ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
-    ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
+    ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0, 0, 0};
+    ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0, 0, 0};
 
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, r, rInv, gammaInv;
 
     ${my_dtype} wpdt2 = wp*dt*dt;
-    ${my_dtype} phasePrev = ${my_dtype}(0.);
+    ${my_dtype} phasePrev = (${my_dtype})0.;
 
     for (uint it=0; it<nSteps-1; it++){
 
-      time = ${my_dtype}(it * dt);
-      nVec = coordOnScreen;
-      nVec -= (${my_dtype}3) {x[it], y[it], z[it]};
-      r = length(nVec);
+      time = (${my_dtype})it * dt;
+      nVec = coordOnScreen - (${my_dtype}3) {x[it], y[it], z[it]};
+      r = ${f_native}sqrt( dot(nVec, nVec) );
 
       phase = omegaLocal * (time + r) ;
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
-      if ( dPhase < ${my_dtype}(M_PI) ) {
+      if ( dPhase < (${my_dtype})M_PI ) {
 
-        rInv = ${my_dtype}(1.0)/r;
-        nVec *= rInv;
+        rInv = (${my_dtype})1. / r;
+        nVec = rInv * nVec;
 
         uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
+
         // for the staggered X and U
         uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
-        uLocal = ${my_dtype}(0.5) * (uNextLocal+uLocal);
+        uLocal = (${my_dtype})0.5 * (uNextLocal+uLocal);
 
-        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uLocal, uLocal) );
+        gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
         uLocal *= gammaInv;
 
         sinPhase = ${f_native}sin(phase);
@@ -74,7 +74,7 @@ __kernel void total(
 
         // re-using local variables
         uLocal = (uLocal - nVec) * omegaLocal * rInv;
-        nVec *= rInv * rInv;
+        nVec = rInv*rInv * nVec;
 
         spectrLocalRe += nVec*cosPhase - uLocal*sinPhase;
         spectrLocalIm += nVec*sinPhase + uLocal*cosPhase;

@@ -32,10 +32,9 @@ __kernel void total(
     uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
 
     ${my_dtype} omegaLocal = omega[iOmega];
-    ${my_dtype}3 nVec = (${my_dtype}3) {
-                       cosTheta[iTheta],
-                       sinTheta[iTheta]*sinPhi[iPhi],
-                       sinTheta[iTheta]*cosPhi[iPhi] };
+    ${my_dtype}3 nVec = (${my_dtype}3) { cosTheta[iTheta],
+                                         sinTheta[iTheta]*sinPhi[iPhi],
+                                         sinTheta[iTheta]*cosPhi[iPhi] };
 
     ${my_dtype}3 xLocal;
     ${my_dtype}3 uLocal;
@@ -46,50 +45,51 @@ __kernel void total(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
     ${my_dtype} c1, c2, gammaInv;
 
-    ${my_dtype} dtInv = ${my_dtype}(1.)/dt;
+    ${my_dtype} dtInv = (${my_dtype})1. / dt;
     ${my_dtype} wpdt2 =  wp * dt*dt;
-    ${my_dtype} phasePrev = ${my_dtype}(0.);
+    ${my_dtype} phasePrev = (${my_dtype}) 0.;
     ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
     ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
 
     for (uint it=0; it<nSteps-1; it++){
 
-      time = (${my_dtype}) (it * dt);
+      time = (${my_dtype})it * dt;
       xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
       phase = omegaLocal * ( time - dot(xLocal, nVec)) ;
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
-      if ( dPhase < ${my_dtype}(M_PI) ) {
+      if ( dPhase < (${my_dtype})M_PI ) {
 
         uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
         uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
 
-        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uLocal, uLocal) );
+        gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
         uLocal *= gammaInv;
-        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uNextLocal, uNextLocal) );
+        gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
         uNextLocal *= gammaInv;
 
         aLocal = (uNextLocal-uLocal) * dtInv;
-        uLocal = ${my_dtype}(0.5) * (uNextLocal+uLocal);
+        uLocal = (${my_dtype})0.5 * (uNextLocal+uLocal);
 
         c1 = dot(aLocal, nVec);
-        c2 = ${my_dtype}(1.) - dot(uLocal, nVec);
+        c2 = (${my_dtype})1. - dot(uLocal, nVec);
 
-        c2 =  ${my_dtype}(1.) / c2;
+        c2 =  (${my_dtype})1. / c2;
         c1 = c1*c2*c2;
 
         sinPhase = ${f_native}sin(phase);
         cosPhase = ${f_native}cos(phase);
 
         amplitude = c1*( nVec-uLocal ) - c2*aLocal;
-        spectrLocalRe += amplitude* cosPhase;
-        spectrLocalIm += amplitude* sinPhase;
+        spectrLocalRe += amplitude * cosPhase;
+        spectrLocalIm += amplitude * sinPhase;
       }
     }
 
-    spectrum[gti] +=  wpdt2 * ( dot(spectrLocalRe, spectrLocalRe) + dot(spectrLocalIm, spectrLocalIm) );
+    spectrum[gti] +=  wpdt2 * ( dot(spectrLocalRe, spectrLocalRe)
+                              + dot(spectrLocalIm, spectrLocalIm) );
    }
 }
 
@@ -125,8 +125,8 @@ __kernel void component(
 
     ${my_dtype} omegaLocal = omega[iOmega];
     ${my_dtype}3 nVec = (${my_dtype}3) { cosTheta[iTheta],
-                       sinTheta[iTheta]*sinPhi[iPhi],
-                       sinTheta[iTheta]*cosPhi[iPhi] };
+                                         sinTheta[iTheta]*sinPhi[iPhi],
+                                         sinTheta[iTheta]*cosPhi[iPhi] };
 
 
     ${my_dtype}3 xLocal;
@@ -138,11 +138,11 @@ __kernel void component(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
     ${my_dtype} c1, c2, gammaInv;
 
-    ${my_dtype} dtInv = ${my_dtype}(1.)/dt;
+    ${my_dtype} dtInv = (${my_dtype})1./dt;
     ${my_dtype} wpdt2 = wp*dt*dt;
-    ${my_dtype} phasePrev = ${my_dtype}(0.);
-    ${my_dtype} spectrLocalRe = ${my_dtype}(0.);
-    ${my_dtype} spectrLocalIm = ${my_dtype}(0.);
+    ${my_dtype} phasePrev = (${my_dtype})0.;
+    ${my_dtype} spectrLocalRe = (${my_dtype})0.;
+    ${my_dtype} spectrLocalIm = (${my_dtype})0.;
 
     for (uint it=0; it<nSteps-1; it++){
 
@@ -153,29 +153,32 @@ __kernel void component(
       dPhase = fabs(phase - phasePrev);
       phasePrev = phase;
 
-      if ( dPhase < ${my_dtype}(M_PI) ) {
+      if ( dPhase < (${my_dtype})M_PI ) {
 
         uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
         uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
 
-        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uLocal, uLocal) );
+        gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
         uLocal *= gammaInv;
-        gammaInv = ${f_native}rsqrt( ${my_dtype}(1.) + dot(uNextLocal, uNextLocal) );
+        gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
         uNextLocal *= gammaInv;
 
         aLocal = (uNextLocal-uLocal) * dtInv;
-        uLocal = ${my_dtype}(0.5) * (uNextLocal+uLocal);
+        uLocal = (${my_dtype})0.5 * (uNextLocal+uLocal);
 
         c1 = dot(aLocal, nVec);
-        c2 = ${my_dtype}(1.) - dot(uLocal, nVec);
+        c2 = (${my_dtype})1. - dot(uLocal, nVec);
 
-        c2 = ${my_dtype}(1.)/c2;
+        c2 = (${my_dtype})1./c2;
         c1 = c1*c2*c2;
 
         sinPhase = ${f_native}sin(phase);
         cosPhase = ${f_native}cos(phase);
 
-        amplitude = c1*( nVec[iComponent]-uLocal[iComponent] ) - c2*aLocal[iComponent];
+        if(iComponent==0) amplitude = c1*( nVec.s0-uLocal.s0 ) - c2*aLocal.s0;
+        if(iComponent==1) amplitude = c1*( nVec.s1-uLocal.s1 ) - c2*aLocal.s1;
+        if(iComponent==2) amplitude = c1*( nVec.s2-uLocal.s2 ) - c2*aLocal.s2;
+
         spectrLocalRe += amplitude* cosPhase;
         spectrLocalIm += amplitude* sinPhase;
       }

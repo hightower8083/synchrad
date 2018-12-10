@@ -118,8 +118,18 @@ class SynchRad(Utilities):
     def _init_args(self, Args):
         self.Args = Args
 
+        if 'mode' not in self.Args.keys():
+            self.Args['mode'] = 'far'
+
         if 'dtype' not in self.Args:
-            self.Args['dtype'] = 'float'
+            if self.Args['mode'] is 'far':
+                self.Args['dtype'] = 'float'
+            if self.Args['mode'] is 'near':
+                self.Args['dtype'] = 'double'
+
+        if self.Args['dtype'] is 'float' and self.Args['mode'] is 'near':
+            print('Warning: single precision is not recommended' + \
+                  ' for nearfield calculations')
 
         if self.Args['dtype'] is 'float':
             self.dtype = np.single
@@ -139,9 +149,6 @@ class SynchRad(Utilities):
 
         if 'Features' not in self.Args.keys():
             self.Args['Features'] = {}
-
-        if 'mode' not in self.Args.keys():
-            self.Args['mode'] = 'far'
 
         gridNodeNums = self.Args['grid'][-1]
 
