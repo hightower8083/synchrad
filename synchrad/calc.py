@@ -127,19 +127,22 @@ class SynchRad(Utilities):
             if self.Args['mode'] is 'near':
                 self.Args['dtype'] = 'double'
 
-        if self.Args['dtype'] is 'float' and self.Args['mode'] is 'near':
-            print('Warning: single precision is not recommended' + \
-                  ' for nearfield calculations')
-
         if self.Args['dtype'] is 'float':
             self.dtype = np.single
         elif self.Args['dtype'] is 'double':
             self.dtype = np.double
 
+        if self.Args['dtype'] is 'float':
+            self.f_native = 'native_'
+        else:
+            self.f_native = ''
+
         if 'no_native' in self.Args:
             self.f_native = ''
-        else:
-            self.f_native = 'native_'
+
+        if self.Args['dtype'] is 'float' and self.Args['mode'] is 'near':
+            print ('Warning: single precision is not recommended' + \
+                  ' for nearfield calculations')
 
         if 'timeStep' not in self.Args.keys():
             raise KeyError("timeStep must be defined.")

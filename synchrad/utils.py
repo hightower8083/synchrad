@@ -18,6 +18,7 @@ class Utilities:
             val = alpha_fs/(4*np.pi**2)*self.Data['radiation'].astype(np.double)
         elif self.Args['mode'] == 'near2D' or self.Args['mode'] == 'near':
             val = alpha_fs*np.pi/4*self.Data['radiation'].astype(np.double)
+            val /= (2*np.pi)**2
 
         if spect_filter is not None:
             val *= spect_filter
