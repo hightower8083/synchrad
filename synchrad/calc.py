@@ -1,12 +1,11 @@
 import numpy as np
-
 import pyopencl as cl
 import pyopencl.array as arrcl
 from mako.template import Template
 
 from .utils import Utilities
-
 from synchrad import __path__ as src_path
+
 src_path = src_path[0] + '/'
 
 
@@ -19,11 +18,11 @@ class SynchRad(Utilities):
         self._init_data()
         self._compile_kernels()
 
-    def calculate_spectrum(self, particleTracks, comp='all'):
+    def calculate_spectrum( self, particleTracks, comp='all' ):
 
         for particleTrack in particleTracks:
             particleTrack = self._track_to_device(particleTrack)
-            self._process_track( particleTrack, comp=comp )
+            self._process_track( particleTrack, comp=comp)
         self._spectr_from_device()
 
     def _spectr_from_device(self):
@@ -47,7 +46,8 @@ class SynchRad(Utilities):
         particleTrack = [x, y, z, ux, uy, uz, wp]
         return particleTrack
 
-    def _process_track(self, particleTrack, comp, return_event=False):
+    def _process_track(self, particleTrack, comp,
+                       return_event=False):
 
         compDict = {'x':0, 'y':1, 'z':2}
 
@@ -122,27 +122,25 @@ class SynchRad(Utilities):
             self.Args['mode'] = 'far'
 
         if 'dtype' not in self.Args:
-            if self.Args['mode'] is 'far':
-                self.Args['dtype'] = 'float'
-            if self.Args['mode'] is 'near':
-                self.Args['dtype'] = 'double'
+            self.Args['dtype'] = 'double'
 
-        if self.Args['dtype'] is 'float':
-            self.dtype = np.single
-        elif self.Args['dtype'] is 'double':
+        if self.Args['dtype'] is 'double':
             self.dtype = np.double
-
-        if self.Args['dtype'] is 'float':
-            self.f_native = 'native_'
-        else:
             self.f_native = ''
+        elif self.Args['dtype'] is 'float':
+            self.dtype = np.single
+            self.f_native = 'native_'
 
         if 'no_native' in self.Args:
             self.f_native = ''
 
-        if self.Args['dtype'] is 'float' and self.Args['mode'] is 'near':
-            print ('Warning: single precision is not recommended' + \
-                  ' for nearfield calculations')
+        if self.Args['dtype'] is 'float':
+            if self.Args['mode'] is 'far':
+                print ( 'WARNING: Chosen single precision should be ' + \
+                        'used with care for the farfield calculations\n' )
+            elif self.Args['mode'] is 'near':
+                print ( 'WARNING: Chosen single precision is not ' + \
+                        'recommended for the nearfield calculations\n' )
 
         if 'timeStep' not in self.Args.keys():
             raise KeyError("timeStep must be defined.")
