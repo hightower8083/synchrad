@@ -3,25 +3,9 @@ from scipy.constants import m_e, c, e, epsilon_0, hbar
 from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
-from numba import jit
-from math import isnan
-
 from tvtk.api import tvtk, write_data
 
 J_in_um = 2e6*np.pi*hbar*c
-
-@jit
-def _addStepToTrack(tracks, nsteps, x, y, z, ux, uy, uz, dNp):
-    Np_select = tracks.shape[0]
-    for ip_select in range(Np_select):
-        ip_glob = ip_select*dNp
-        if isnan(w[ip_glob]): continue
-        point = [ x[ip_glob], y[ip_glob], z[ip_glob],
-                  ux[ip_glob], uy[ip_glob], uz[ip_glob] ]
-
-        tracks[ip_select, :, nsteps[ip_select]] = point
-        nsteps[ip_select] += 1
-    return tracks, nsteps
 
 
 class Utilities:
@@ -178,26 +162,43 @@ class Utilities:
 
         write_data(spc_vtk, filename)
 
-    def fromOPMD(ts, pt, ref_iteration, select=None, dNp=1):
-#        pt = ParticleTracker( ts, iteration=ref_iteration, select=select,
-#                             preserve_particle_index=True )
-        w_select, = ts.get_particle(var_list=['w',], select=pt,
-                                    iteration=ref_iteration )
-        w_select = w_select[::dNp]
-        Np = pt.N_selected
-        Nt = ts.iterations.size
-        Np_select = Np//dNp
+def tracksFromOPMD(ts, pt, ref_iteration, dNp=1):
+    w_select, = ts.get_particle(var_list=['w',], select=pt,
+                                iteration=ref_iteration )
+    w_select = w_select[::dNp]
+    Np = pt.N_selected
+    Nt = ts.iterations.size
+    Np_select = Np//dNp
 
-        tracks = np.zeros( (Np_select, 6, Nt), dtype=np.double )
-        nsteps = np.zeros( Np_select, dtype=np.int )
+    dt = (ts.t[1] - ts.t[0]) * c * 1e6 # in microns as coordinates
 
-        for iteration in ts.iterations:
-            x, y, z, ux, uy, uz, w = ts.get_particle(
-                var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'w'],
-                select=pt, iteration=iteration )
+    tracks = np.zeros( (Np_select, 6, Nt), dtype=np.double )
+    nsteps = np.zeros( Np_select, dtype=np.int )
 
-            if w.shape[0] < Np: continue
-            tracks, nsteps = _addStepToTrack( tracks, nsteps,
-                                     x, y, z, ux, uy, uz, dNp )
-            # print('.', end='')
-        return tracks, nsteps, w_select
+    for iteration in ts.iterations:
+        x, y, z, ux, uy, uz, w = ts.get_particle(
+            var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'w'],
+            select=pt, iteration=iteration )
+
+        if w.shape[0] < Np: continue
+        for ip_select in range(Np_select):
+            ip_glob = ip_select*dNp
+            if np.isnan(x[ip_glob]): continue
+            point = [ x[ip_glob], y[ip_glob], z[ip_glob],
+                      ux[ip_glob], uy[ip_glob], uz[ip_glob] ]
+    
+            tracks[ip_select, :, nsteps[ip_select]] = point
+            nsteps[ip_select] += 1
+        
+        print( "Done {:0.1f}%".format(iteration/ts.iterations[-1] * 100),
+               end='\r', flush=True)
+
+    particleTracks = []
+    for ip, track in enumerate(tracks):
+        x, y, z, ux, uy, uz = track
+        particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]], 
+                                z[:nsteps[ip]], ux[:nsteps[ip]], 
+                                uy[:nsteps[ip]], uz[:nsteps[ip]], 
+                                w_select[ip]] )
+
+    return particleTracks, dt
