@@ -3,7 +3,14 @@ from scipy.constants import m_e, c, e, epsilon_0, hbar
 from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
-from tvtk.api import tvtk, write_data
+
+
+try:
+    from tvtk.api import tvtk, write_data
+    tvtk_installed = True
+except (ImportError,):
+    tvtk_installed = False
+
 
 J_in_um = 2e6*np.pi*hbar*c
 
@@ -120,6 +127,10 @@ class Utilities:
                      lambda0_um = None, smooth_filter=None, \
                      filename='spectrum', project=False):
 
+        if not tvtk_installed:
+            print('TVTK API is not found')
+            return
+
         omega, theta, phi = self.Args['omega'], self.Args['theta'],\
                             self.Args['phi']
         phi = np.r_[phi, 2*np.pi]
@@ -162,7 +173,8 @@ class Utilities:
 
         write_data(spc_vtk, filename)
 
-def tracksFromOPMD(ts, pt, ref_iteration, dNp=1):
+def tracksFromOPMD(ts, pt, ref_iteration, dNp=1, verbose=True):
+
     w_select, = ts.get_particle(var_list=['w',], select=pt,
                                 iteration=ref_iteration )
     w_select = w_select[::dNp]
@@ -190,8 +202,9 @@ def tracksFromOPMD(ts, pt, ref_iteration, dNp=1):
             tracks[ip_select, :, nsteps[ip_select]] = point
             nsteps[ip_select] += 1
         
-        print( "Done {:0.1f}%".format(iteration/ts.iterations[-1] * 100),
-               end='\r', flush=True)
+        if verbose:
+            print( "Done {:0.1f}%".format(iteration/ts.iterations[-1] * 100),
+                   end='\r', flush=True)
 
     particleTracks = []
     for ip, track in enumerate(tracks):
