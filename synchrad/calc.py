@@ -18,11 +18,21 @@ class SynchRad(Utilities):
         self._init_data()
         self._compile_kernels()
 
-    def calculate_spectrum( self, particleTracks, comp='all' ):
+    def calculate_spectrum( self, particleTracks=[],
+                            h5_file=None, comp='all' ):
 
-        for particleTrack in particleTracks:
-            particleTrack = self._track_to_device(particleTrack)
-            self._process_track( particleTrack, comp=comp)
+        for track in particleTracks:
+            track = self._track_to_device(track)
+            self._process_track(track, comp=comp)
+
+        if h5_file is not None:
+            Np = h5_file['misc/N_particles']
+            comps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
+            for ip in range(Np):
+                track = [h5_file[f'tracks/{ip:d}/{comp}'] comp in comps]
+                track = self._track_to_device(track)
+                self._process_track(track, comp=comp)
+
         self._spectr_from_device()
 
     def _spectr_from_device(self):

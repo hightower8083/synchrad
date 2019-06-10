@@ -4,13 +4,11 @@ from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 
-
 try:
     from tvtk.api import tvtk, write_data
     tvtk_installed = True
 except (ImportError,):
     tvtk_installed = False
-
 
 J_in_um = 2e6*np.pi*hbar*c
 
@@ -131,7 +129,7 @@ class Utilities:
             print('TVTK API is not found')
             return
 
-        omega, theta, phi = self.Args['omega'], self.Args['theta'],\
+        omega, theta, phi = self.Args['omega'], self.Args['theta'], \
                             self.Args['phi']
         phi = np.r_[phi, 2*np.pi]
 
@@ -140,7 +138,7 @@ class Utilities:
                         phot_num=phot_num, lambda0_um=lambda0_um)
             scalar_name = 'spectrum'
         else:
-            val = self.get_spot( phot_num=phot_num, lambda0_um=lambda0_um,\
+            val = self.get_spot( phot_num=phot_num, lambda0_um=lambda0_um, \
                                  spect_filter=spect_filter)
             val = val[None, :, :]
             omega = omega[[-1]]
@@ -198,10 +196,10 @@ def tracksFromOPMD(ts, pt, ref_iteration, dNp=1, verbose=True):
             if np.isnan(x[ip_glob]): continue
             point = [ x[ip_glob], y[ip_glob], z[ip_glob],
                       ux[ip_glob], uy[ip_glob], uz[ip_glob] ]
-    
+
             tracks[ip_select, :, nsteps[ip_select]] = point
             nsteps[ip_select] += 1
-        
+
         if verbose:
             print( "Done {:0.1f}%".format(iteration/ts.iterations[-1] * 100),
                    end='\r', flush=True)
@@ -209,9 +207,9 @@ def tracksFromOPMD(ts, pt, ref_iteration, dNp=1, verbose=True):
     particleTracks = []
     for ip, track in enumerate(tracks):
         x, y, z, ux, uy, uz = track
-        particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]], 
-                                z[:nsteps[ip]], ux[:nsteps[ip]], 
-                                uy[:nsteps[ip]], uz[:nsteps[ip]], 
+        particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]],
+                                z[:nsteps[ip]], ux[:nsteps[ip]],
+                                uy[:nsteps[ip]], uz[:nsteps[ip]],
                                 w_select[ip]] )
 
     return particleTracks, dt
