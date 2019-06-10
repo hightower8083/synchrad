@@ -29,7 +29,7 @@ class SynchRad(Utilities):
             Np = h5_file['misc/N_particles']
             comps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
             for ip in range(Np):
-                track = [h5_file[f'tracks/{ip:d}/{comp}'] comp in comps]
+                track = [h5_file[f'tracks/{ip:d}/{comp}'] for comp in comps]
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
 
