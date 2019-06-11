@@ -6,6 +6,8 @@ from mako.template import Template
 from .utils import Utilities
 from synchrad import __path__ as src_path
 
+from mpi4py import MPI
+
 src_path = src_path[0] + '/'
 
 
@@ -13,15 +15,18 @@ class SynchRad(Utilities):
 
     def __init__(self, Args={}):
 
+        self.comm = MPI.COMM_WORLD
+
         self._init_args(Args)
         self._init_comm()
         self._init_data()
         self._compile_kernels()
 
+
     def calculate_spectrum( self, particleTracks=[],
                             h5_file=None, comp='all' ):
 
-        for track in particleTracks:
+        for track in particleTracks[self.comm.rank::self.comm.size]:
             track = self._track_to_device(track)
             self._process_track(track, comp=comp)
 
@@ -34,6 +39,14 @@ class SynchRad(Utilities):
                 self._process_track(track, comp=comp)
 
         self._spectr_from_device()
+        self._gather_result_mpi()
+
+    def _gather_result_mpi(self):
+        buff = np.zeros_like(self.Data['radiation'])
+        self.comm.barrier()
+        self.comm.Reduce([self.Data['radiation'].astype(np.double), MPI.DOUBLE], [buff, MPI.DOUBLE])
+        self.comm.barrier()
+        self.Data['radiation'] = buff
 
     def _spectr_from_device(self):
         self.Data['radiation'] = self.Data['radiation'].get().T
@@ -261,6 +274,9 @@ class SynchRad(Utilities):
         ctx_kw_args = {}
         if self.Args['ctx'] is None:
             ctx_kw_args['interactive'] = True
+        elif self.Args['ctx'] is 'mpi':
+            # temporal definition, assumes default 0th platform
+            ctx_kw_args['answers'] = [0, self.comm.rank]
         else:
             ctx_kw_args['answers'] = self.Args['ctx']
 
@@ -274,8 +290,13 @@ class SynchRad(Utilities):
         self.plat_name = selected_dev.platform.vendor
         self.ocl_version = selected_dev.opencl_c_version
 
-        print("{} device: {} \nPlatform: {}\nCompiler: {}".\
-               format( self.dev_type, self.dev_name,
-                       self.plat_name, self.ocl_version) )
+        if self.comm.rank==0:
+            print("Running on {} devices".format(self.comm.size))
+        self.comm.barrier()
+        print( "  {} device: {}".format(self.dev_type, self.dev_name) )
+
+        if self.comm.rank==0:
+            print("Platform: {}\nCompiler: {}".\
+                   format(self.plat_name, self.ocl_version) )
 
         self._set_global_working_group_size()
