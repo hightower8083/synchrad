@@ -168,7 +168,6 @@ class Utilities:
 
         spc_vtk.point_data.scalars = val.flatten()
         spc_vtk.point_data.scalars.name = scalar_name
-
         write_data(spc_vtk, filename)
 
 def tracksFromOPMD(ts, pt, ref_iteration, dNp=1, verbose=True):

@@ -27,25 +27,32 @@ class SynchRad(Utilities):
                             h5_file=None, comp='all',
                             Np_max=None ):
 
-        if len(particleTracks)>0:
-            if Np_max is None:
-                Np = len(particleTracks)
-            else:
-                Np = min(Np_max, len(particleTracks))
+        if h5_file is not None:
+            particleTracks=[]
 
-            for track in particleTracks[:Np][self.comm.rank::self.comm.size]:
+            if self.comm.rank==0:
+                print('Input from the file, list input is ignored')
+
+            Np = h5_file['misc/N_particles'][()]
+            cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
+            if Np_max is not None:
+                Np = min(Np_max, Np)
+
+            part_ind = np.arange(Np)[self.comm.rank::self.comm.size]
+            for ip in part_ind:
+                track = [h5_file[f'tracks/{ip:d}/{cmp}'][()] for cmp in cmps]
+                particleTracks.append(track)
+
+            for track in particleTracks:
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
 
-        if h5_file is not None:
-            if Np_max is None:
-                Np = h5_file['misc/N_particles'][()]
-            else:
-                Np = min(Np_max, h5_file['misc/N_particles'][()])
+        else:
+            Np = len(particleTracks)
+            if Np_max is not None:
+                Np = min(Np_max, Np)
 
-            cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
-            for ip in range(Np):
-                track = [h5_file[f'tracks/{ip:d}/{cmp}'][()] for cmp in cmps]
+            for track in particleTracks[:Np][self.comm.rank::self.comm.size]:
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
 
@@ -302,14 +309,12 @@ class SynchRad(Utilities):
         self.plat_name = selected_dev.platform.vendor
         self.ocl_version = selected_dev.opencl_c_version
 
+        msg = "  {} device: {}".format(self.dev_type, self.dev_name)
+        msg = self.comm.gather(msg)
+
         if self.comm.rank==0:
             print("Running on {} devices".format(self.comm.size))
-        self.comm.barrier()
-
-        print( "  {} device: {}".format(self.dev_type, self.dev_name) )
-        self.comm.barrier()
-
-        if self.comm.rank==0:
+            for s in msg: print(s)
             print("Platform: {}\nCompiler: {}".\
                    format(self.plat_name, self.ocl_version) )
 
