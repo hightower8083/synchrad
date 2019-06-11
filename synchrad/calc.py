@@ -24,17 +24,28 @@ class SynchRad(Utilities):
 
 
     def calculate_spectrum( self, particleTracks=[],
-                            h5_file=None, comp='all' ):
+                            h5_file=None, comp='all',
+                            Np_max=None ):
 
-        for track in particleTracks[self.comm.rank::self.comm.size]:
-            track = self._track_to_device(track)
-            self._process_track(track, comp=comp)
+        if len(particleTracks)>0:
+            if Np_max is None:
+                Np = len(particleTracks)
+            else:
+                Np = min(Np_max, len(particleTracks))
+
+            for track in particleTracks[:Np][self.comm.rank::self.comm.size]:
+                track = self._track_to_device(track)
+                self._process_track(track, comp=comp)
 
         if h5_file is not None:
-            Np = h5_file['misc/N_particles']
-            comps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
+            if Np_max is None:
+                Np = h5_file['misc/N_particles'][()]
+            else:
+                Np = min(Np_max, h5_file['misc/N_particles'][()])
+
+            cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
             for ip in range(Np):
-                track = [h5_file[f'tracks/{ip:d}/{comp}'] for comp in comps]
+                track = [h5_file[f'tracks/{ip:d}/{cmp}'][()] for cmp in cmps]
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
 
@@ -44,7 +55,8 @@ class SynchRad(Utilities):
     def _gather_result_mpi(self):
         buff = np.zeros_like(self.Data['radiation'])
         self.comm.barrier()
-        self.comm.Reduce([self.Data['radiation'].astype(np.double), MPI.DOUBLE], [buff, MPI.DOUBLE])
+        self.comm.Reduce([self.Data['radiation'].astype(np.double), MPI.DOUBLE],
+                         [buff, MPI.DOUBLE])
         self.comm.barrier()
         self.Data['radiation'] = buff
 
@@ -293,7 +305,9 @@ class SynchRad(Utilities):
         if self.comm.rank==0:
             print("Running on {} devices".format(self.comm.size))
         self.comm.barrier()
+
         print( "  {} device: {}".format(self.dev_type, self.dev_name) )
+        self.comm.barrier()
 
         if self.comm.rank==0:
             print("Platform: {}\nCompiler: {}".\
