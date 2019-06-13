@@ -3,6 +3,7 @@ from scipy.constants import m_e, c, e, epsilon_0, hbar
 from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
+import h5py
 
 try:
     from tvtk.api import tvtk, write_data
@@ -170,7 +171,7 @@ class Utilities:
         spc_vtk.point_data.scalars.name = scalar_name
         write_data(spc_vtk, filename)
 
-def tracksFromOPMD(ts, pt, ref_iteration, dNp=1, verbose=True):
+def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, verbose=True):
 
     w_select, = ts.get_particle(var_list=['w',], select=pt,
                                 iteration=ref_iteration )
@@ -203,12 +204,36 @@ def tracksFromOPMD(ts, pt, ref_iteration, dNp=1, verbose=True):
             print( "Done {:0.1f}%".format(iteration/ts.iterations[-1] * 100),
                    end='\r', flush=True)
 
-    particleTracks = []
-    for ip, track in enumerate(tracks):
-        x, y, z, ux, uy, uz = track
-        particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]],
-                                z[:nsteps[ip]], ux[:nsteps[ip]],
-                                uy[:nsteps[ip]], uz[:nsteps[ip]],
-                                w_select[ip]] )
 
-    return particleTracks, dt
+    if fname is not None:
+        f = h5py.File(fname, mode='a')
+        i_tr = 0
+        for ip, track in enumerate(tracks):
+            x, y, z, ux, uy, uz = track
+            if nsteps[ip]<8 :  continue
+
+            f[f'tracks/{i_tr:d}/x'] = x[:nsteps[ip]]
+            f[f'tracks/{i_tr:d}/y'] = y[:nsteps[ip]]
+            f[f'tracks/{i_tr:d}/z'] = z[:nsteps[ip]]
+            f[f'tracks/{i_tr:d}/ux'] = ux[:nsteps[ip]]
+            f[f'tracks/{i_tr:d}/uy'] = uy[:nsteps[ip]]
+            f[f'tracks/{i_tr:d}/uz'] = uz[:nsteps[ip]]
+            f[f'tracks/{itr:d}/w'] = w_select[ip]
+            i_tr += 1
+
+        f['misc/cdt'] = dt
+        f['misc/N_particles'] = i_tr
+        f['misc/propagation_direction'] = 'z'
+        f.close()
+        return 0
+    else:
+        particleTracks = []
+        for ip, track in enumerate(tracks):
+            x, y, z, ux, uy, uz = track
+            if nsteps[ip]<8 :  continue
+            particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]],
+                                    z[:nsteps[ip]], ux[:nsteps[ip]],
+                                    uy[:nsteps[ip]], uz[:nsteps[ip]],
+                                    w_select[ip]] )
+
+        return particleTracks, dt
