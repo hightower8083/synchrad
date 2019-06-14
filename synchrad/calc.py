@@ -6,6 +6,13 @@ from mako.template import Template
 from .utils import Utilities
 from synchrad import __path__ as src_path
 
+try:
+    from mpi4py import MPI
+    mpi_installed = True
+except (ImportError,):
+    mpi_installed = False
+
+
 src_path = src_path[0] + '/'
 
 
@@ -13,27 +20,81 @@ class SynchRad(Utilities):
 
     def __init__(self, Args={}):
 
+        if mpi_installed:
+            self.comm = MPI.COMM_WORLD
+            self.rank = self.comm.rank
+            self.size = self.comm.size
+        else:
+            self.rank = 0
+            self.size = 1
+
         self._init_args(Args)
         self._init_comm()
         self._init_data()
         self._compile_kernels()
 
-    def calculate_spectrum( self, particleTracks=[],
-                            h5_file=None, comp='all' ):
 
-        for track in particleTracks:
-            track = self._track_to_device(track)
-            self._process_track(track, comp=comp)
+    def calculate_spectrum( self, particleTracks=[],
+                            h5_file=None, comp='all',
+                            Np_max=None, verbose=True ):
 
         if h5_file is not None:
-            Np = h5_file['misc/N_particles']
-            comps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
-            for ip in range(Np):
-                track = [h5_file[f'tracks/{ip:d}/{comp}'] for comp in comps]
+            particleTracks=[]
+
+            if self.rank==0:
+                print('Input from the file, list input is ignored')
+
+            Np = h5_file['misc/N_particles'][()]
+            cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
+            if Np_max is not None:
+                Np = min(Np_max, Np)
+
+            # load all tracks to RAM (need more speed tests)
+            part_ind = np.arange(Np)[self.rank::self.size]
+            for ip in part_ind:
+                track = [h5_file[f'tracks/{ip:d}/{cmp}'][()] for cmp in cmps]
+                particleTracks.append(track)
+
+            if self.rank==0:
+                print('Tracks are loaded')
+
+            itr = 0
+            for track in particleTracks:
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
+                itr += 1
+                if self.rank==0 and verbose:
+                    progress = itr/len(particleTracks) * 100
+                    print("Done {:0.1f}%".format(progress),
+                          end='\r', flush=True)
+        else:
+            Np = len(particleTracks)
+            if Np_max is not None:
+                Np = min(Np_max, Np)
+
+            particleTracks = particleTracks[:Np][self.rank::self.size]
+
+            itr = 0
+            for track in particleTracks:
+                track = self._track_to_device(track)
+                self._process_track(track, comp=comp)
+                itr += 1
+                if self.rank==0 and verbose:
+                    progress = itr/len(particleTracks) * 100
+                    print("Done {:0.1f}%".format(progress),
+                          end='\r', flush=True)
 
         self._spectr_from_device()
+        if mpi_installed:
+            self._gather_result_mpi()
+
+    def _gather_result_mpi(self):
+        buff = np.zeros_like(self.Data['radiation'])
+        self.comm.barrier()
+        self.comm.Reduce([self.Data['radiation'].astype(np.double), MPI.DOUBLE],
+                         [buff, MPI.DOUBLE])
+        self.comm.barrier()
+        self.Data['radiation'] = buff
 
     def _spectr_from_device(self):
         self.Data['radiation'] = self.Data['radiation'].get().T
@@ -261,6 +322,9 @@ class SynchRad(Utilities):
         ctx_kw_args = {}
         if self.Args['ctx'] is None:
             ctx_kw_args['interactive'] = True
+        elif self.Args['ctx'] is 'mpi':
+            # temporal definition, assumes default 0th platform
+            ctx_kw_args['answers'] = [0, self.rank]
         else:
             ctx_kw_args['answers'] = self.Args['ctx']
 
@@ -274,8 +338,13 @@ class SynchRad(Utilities):
         self.plat_name = selected_dev.platform.vendor
         self.ocl_version = selected_dev.opencl_c_version
 
-        print("{} device: {} \nPlatform: {}\nCompiler: {}".\
-               format( self.dev_type, self.dev_name,
-                       self.plat_name, self.ocl_version) )
+        msg = "  {} device: {}".format(self.dev_type, self.dev_name)
+        msg = self.comm.gather(msg)
+
+        if self.rank==0:
+            print("Running on {} devices".format(self.size))
+            for s in msg: print(s)
+            print("Platform: {}\nCompiler: {}".\
+                   format(self.plat_name, self.ocl_version) )
 
         self._set_global_working_group_size()
