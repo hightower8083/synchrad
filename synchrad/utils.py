@@ -171,21 +171,33 @@ class Utilities:
         spc_vtk.point_data.scalars.name = scalar_name
         write_data(spc_vtk, filename)
 
-def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, verbose=True):
+def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Nit_min=None,
+                   Nit_max=None, verbose=True):
 
     w_select, = ts.get_particle(var_list=['w',], select=pt,
                                 iteration=ref_iteration )
     w_select = w_select[::dNp]
     Np = pt.N_selected
-    Nt = ts.iterations.size
     Np_select = Np//dNp
+
+    iterations = ts.iterations.copy()
+    filter = np.ones_like(iterations)
+    if Nit_min is not None:
+        filter *= (iterations>Nit_min)
+    if Nit_max is not None:
+        filter *= (iterations<Nit_max)
+        
+    iter_ind_select = np.nonzero(filter)[0]
+    iterations = iterations[iter_ind_select]
+    
+    Nt = iterations.size
 
     dt = (ts.t[1] - ts.t[0]) * c * 1e6 # in microns as coordinates
 
     tracks = np.zeros( (Np_select, 6, Nt), dtype=np.double )
     nsteps = np.zeros( Np_select, dtype=np.int )
 
-    for iteration in ts.iterations:
+    for it, iteration in enumerate(iterations):
         x, y, z, ux, uy, uz, w = ts.get_particle(
             var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'w'],
             select=pt, iteration=iteration )
@@ -201,31 +213,29 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, verbose=True):
             nsteps[ip_select] += 1
 
         if verbose:
-            print( "Done {:0.1f}%".format(iteration/ts.iterations[-1] * 100),
+            print( "Done {:0.1f}%".format(it/len(iterations) * 100),
                    end='\r', flush=True)
 
-
     if fname is not None:
-        f = h5py.File(fname, mode='a')
+        f = h5py.File(fname, mode='w')
         i_tr = 0
         for ip, track in enumerate(tracks):
             x, y, z, ux, uy, uz = track
-            if nsteps[ip]<8 :  continue
-
-            f[f'tracks/{i_tr:d}/x'] = x[:nsteps[ip]]
-            f[f'tracks/{i_tr:d}/y'] = y[:nsteps[ip]]
-            f[f'tracks/{i_tr:d}/z'] = z[:nsteps[ip]]
-            f[f'tracks/{i_tr:d}/ux'] = ux[:nsteps[ip]]
-            f[f'tracks/{i_tr:d}/uy'] = uy[:nsteps[ip]]
-            f[f'tracks/{i_tr:d}/uz'] = uz[:nsteps[ip]]
-            f[f'tracks/{itr:d}/w'] = w_select[ip]
-            i_tr += 1
-
+            if nsteps[ip]>8 :
+                f[f'tracks/{i_tr:d}/x'] = x[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/y'] = y[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/z'] = z[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/ux'] = ux[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/uy'] = uy[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/uz'] = uz[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/w'] = w_select[ip]
+                i_tr += 1
+        
         f['misc/cdt'] = dt
         f['misc/N_particles'] = i_tr
         f['misc/propagation_direction'] = 'z'
         f.close()
-        return 0
+        return
     else:
         particleTracks = []
         for ip, track in enumerate(tracks):

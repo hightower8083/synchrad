@@ -6,7 +6,12 @@ from mako.template import Template
 from .utils import Utilities
 from synchrad import __path__ as src_path
 
-from mpi4py import MPI
+try:
+    from mpi4py import MPI
+    mpi_installed = True
+except (ImportError,):
+    mpi_installed = False
+
 
 src_path = src_path[0] + '/'
 
@@ -15,7 +20,13 @@ class SynchRad(Utilities):
 
     def __init__(self, Args={}):
 
-        self.comm = MPI.COMM_WORLD
+        if mpi_installed:
+            self.comm = MPI.COMM_WORLD
+            self.rank = self.comm.rank
+            self.size = self.comm.size
+        else:
+            self.rank = 0
+            self.size = 1
 
         self._init_args(Args)
         self._init_comm()
@@ -30,7 +41,7 @@ class SynchRad(Utilities):
         if h5_file is not None:
             particleTracks=[]
 
-            if self.comm.rank==0:
+            if self.rank==0:
                 print('Input from the file, list input is ignored')
 
             Np = h5_file['misc/N_particles'][()]
@@ -38,7 +49,7 @@ class SynchRad(Utilities):
             if Np_max is not None:
                 Np = min(Np_max, Np)
 
-            part_ind = np.arange(Np)[self.comm.rank::self.comm.size]
+            part_ind = np.arange(Np)[self.rank::self.size]
             for ip in part_ind:
                 track = [h5_file[f'tracks/{ip:d}/{cmp}'][()] for cmp in cmps]
                 particleTracks.append(track)
@@ -52,12 +63,13 @@ class SynchRad(Utilities):
             if Np_max is not None:
                 Np = min(Np_max, Np)
 
-            for track in particleTracks[:Np][self.comm.rank::self.comm.size]:
+            for track in particleTracks[:Np][self.rank::self.size]:
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
 
         self._spectr_from_device()
-        self._gather_result_mpi()
+        if mpi_installed:
+            self._gather_result_mpi()
 
     def _gather_result_mpi(self):
         buff = np.zeros_like(self.Data['radiation'])
@@ -295,7 +307,7 @@ class SynchRad(Utilities):
             ctx_kw_args['interactive'] = True
         elif self.Args['ctx'] is 'mpi':
             # temporal definition, assumes default 0th platform
-            ctx_kw_args['answers'] = [0, self.comm.rank]
+            ctx_kw_args['answers'] = [0, self.rank]
         else:
             ctx_kw_args['answers'] = self.Args['ctx']
 
@@ -312,8 +324,8 @@ class SynchRad(Utilities):
         msg = "  {} device: {}".format(self.dev_type, self.dev_name)
         msg = self.comm.gather(msg)
 
-        if self.comm.rank==0:
-            print("Running on {} devices".format(self.comm.size))
+        if self.rank==0:
+            print("Running on {} devices".format(self.size))
             for s in msg: print(s)
             print("Platform: {}\nCompiler: {}".\
                    format(self.plat_name, self.ocl_version) )

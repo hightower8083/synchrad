@@ -2,4 +2,3 @@ numpy
 scipy
 mako
 pyopencl
-mpi4py
