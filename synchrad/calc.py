@@ -339,7 +339,10 @@ class SynchRad(Utilities):
         self.ocl_version = selected_dev.opencl_c_version
 
         msg = "  {} device: {}".format(self.dev_type, self.dev_name)
-        msg = self.comm.gather(msg)
+        if self.size>1:
+            msg = self.comm.gather(msg)
+        else:
+            msg = [msg,]
 
         if self.rank==0:
             print("Running on {} devices".format(self.size))
