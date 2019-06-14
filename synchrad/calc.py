@@ -36,7 +36,7 @@ class SynchRad(Utilities):
 
     def calculate_spectrum( self, particleTracks=[],
                             h5_file=None, comp='all',
-                            Np_max=None ):
+                            Np_max=None, verbose=True ):
 
         if h5_file is not None:
             particleTracks=[]
@@ -49,23 +49,40 @@ class SynchRad(Utilities):
             if Np_max is not None:
                 Np = min(Np_max, Np)
 
+            # load all tracks to RAM (need more speed tests)
             part_ind = np.arange(Np)[self.rank::self.size]
             for ip in part_ind:
                 track = [h5_file[f'tracks/{ip:d}/{cmp}'][()] for cmp in cmps]
                 particleTracks.append(track)
 
+            if self.rank==0:
+                print('Tracks are loaded')
+
+            itr = 0
             for track in particleTracks:
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
-
+                itr += 1
+                if self.rank==0 and verbose:
+                    progress = itr/len(particleTracks) * 100
+                    print("Done {:0.1f}%".format(progress),
+                          end='\r', flush=True)
         else:
             Np = len(particleTracks)
             if Np_max is not None:
                 Np = min(Np_max, Np)
 
-            for track in particleTracks[:Np][self.rank::self.size]:
+            particleTracks = particleTracks[:Np][self.rank::self.size]
+
+            itr = 0
+            for track in particleTracks:
                 track = self._track_to_device(track)
                 self._process_track(track, comp=comp)
+                itr += 1
+                if self.rank==0 and verbose:
+                    progress = itr/len(particleTracks) * 100
+                    print("Done {:0.1f}%".format(progress),
+                          end='\r', flush=True)
 
         self._spectr_from_device()
         if mpi_installed:

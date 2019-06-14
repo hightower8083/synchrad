@@ -186,10 +186,9 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Nit_min=None,
         filter *= (iterations>Nit_min)
     if Nit_max is not None:
         filter *= (iterations<Nit_max)
-        
+
     iter_ind_select = np.nonzero(filter)[0]
     iterations = iterations[iter_ind_select]
-    
     Nt = iterations.size
 
     dt = (ts.t[1] - ts.t[0]) * c * 1e6 # in microns as coordinates
