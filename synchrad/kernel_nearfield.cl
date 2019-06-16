@@ -1,4 +1,5 @@
 // kernels of far field calculation (total and single component)
+
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 __kernel void total(

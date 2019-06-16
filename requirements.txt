@@ -2,3 +2,4 @@ numpy
 scipy
 mako
 pyopencl
+h5py

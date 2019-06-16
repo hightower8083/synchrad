@@ -3,8 +3,13 @@ from scipy.constants import m_e, c, e, epsilon_0, hbar
 from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
+import h5py
 
-from tvtk.api import tvtk, write_data
+try:
+    from tvtk.api import tvtk, write_data
+    tvtk_installed = True
+except (ImportError,):
+    tvtk_installed = False
 
 J_in_um = 2e6*np.pi*hbar*c
 
@@ -121,7 +126,11 @@ class Utilities:
                      lambda0_um = None, smooth_filter=None, \
                      filename='spectrum', project=False):
 
-        omega, theta, phi = self.Args['omega'], self.Args['theta'],\
+        if not tvtk_installed:
+            print('TVTK API is not found')
+            return
+
+        omega, theta, phi = self.Args['omega'], self.Args['theta'], \
                             self.Args['phi']
         phi = np.r_[phi, 2*np.pi]
 
@@ -130,7 +139,7 @@ class Utilities:
                         phot_num=phot_num, lambda0_um=lambda0_um)
             scalar_name = 'spectrum'
         else:
-            val = self.get_spot( phot_num=phot_num, lambda0_um=lambda0_um,\
+            val = self.get_spot( phot_num=phot_num, lambda0_um=lambda0_um, \
                                  spect_filter=spect_filter)
             val = val[None, :, :]
             omega = omega[[-1]]
@@ -160,5 +169,80 @@ class Utilities:
 
         spc_vtk.point_data.scalars = val.flatten()
         spc_vtk.point_data.scalars.name = scalar_name
-
         write_data(spc_vtk, filename)
+
+def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Nit_min=None,
+                   Nit_max=None, verbose=True):
+
+    w_select, = ts.get_particle(var_list=['w',], select=pt,
+                                iteration=ref_iteration )
+    w_select = w_select[::dNp]
+    Np = pt.N_selected
+    Np_select = Np//dNp
+
+    iterations = ts.iterations.copy()
+    filter = np.ones_like(iterations)
+    if Nit_min is not None:
+        filter *= (iterations>Nit_min)
+    if Nit_max is not None:
+        filter *= (iterations<Nit_max)
+
+    iter_ind_select = np.nonzero(filter)[0]
+    iterations = iterations[iter_ind_select]
+    Nt = iterations.size
+
+    dt = (ts.t[1] - ts.t[0]) * c * 1e6 # in microns as coordinates
+
+    tracks = np.zeros( (Np_select, 6, Nt), dtype=np.double )
+    nsteps = np.zeros( Np_select, dtype=np.int )
+
+    for it, iteration in enumerate(iterations):
+        x, y, z, ux, uy, uz, w = ts.get_particle(
+            var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'w'],
+            select=pt, iteration=iteration )
+
+        if w.shape[0] < Np: continue
+        for ip_select in range(Np_select):
+            ip_glob = ip_select*dNp
+            if np.isnan(x[ip_glob]): continue
+            point = [ x[ip_glob], y[ip_glob], z[ip_glob],
+                      ux[ip_glob], uy[ip_glob], uz[ip_glob] ]
+
+            tracks[ip_select, :, nsteps[ip_select]] = point
+            nsteps[ip_select] += 1
+
+        if verbose:
+            print( "Done {:0.1f}%".format(it/len(iterations) * 100),
+                   end='\r', flush=True)
+
+    if fname is not None:
+        f = h5py.File(fname, mode='w')
+        i_tr = 0
+        for ip, track in enumerate(tracks):
+            x, y, z, ux, uy, uz = track
+            if nsteps[ip]>8 :
+                f[f'tracks/{i_tr:d}/x'] = x[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/y'] = y[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/z'] = z[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/ux'] = ux[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/uy'] = uy[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/uz'] = uz[:nsteps[ip]]
+                f[f'tracks/{i_tr:d}/w'] = w_select[ip]
+                i_tr += 1
+        
+        f['misc/cdt'] = dt
+        f['misc/N_particles'] = i_tr
+        f['misc/propagation_direction'] = 'z'
+        f.close()
+        return
+    else:
+        particleTracks = []
+        for ip, track in enumerate(tracks):
+            x, y, z, ux, uy, uz = track
+            if nsteps[ip]<8 :  continue
+            particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]],
+                                    z[:nsteps[ip]], ux[:nsteps[ip]],
+                                    uy[:nsteps[ip]], uz[:nsteps[ip]],
+                                    w_select[ip]] )
+
+        return particleTracks, dt
