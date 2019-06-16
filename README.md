@@ -1,1 +1,79 @@
-Synchrotron Radiation calculator via openCL
+# Synchrotron Radiation calculator via openCL
+
+
+## Overview
+
+Tool to compute energy density of synchrotron radiation in the spectral volume using the Fourier transformed Lienard-Wiechert potentials (see eq. (14.65) of J.D.Jackson's _Classical electrodynamics_). 
+Software processes 3D (`x`, `y`, `z`, `px`, `py`, `pz`) trajectories of charged point-like particles with weights and maps the emmitied energy to the 3D spectral domain (`omega`, `theta`, `phi`). 
+The package also contains number of convenience methods for pre- and post-proccessing.
+
+### Language and hardware
+
+**SynchRad** is written in [openCL](https://www.khronos.org/opencl) and is interfaced with Python using [PyOpenCL](https://mathema.tician.de/software/pyopencl), also uses 
+[Mako](https://github.com/sqlalchemy/mako) template manager for tweaking with the data types. It was tested on GPU and CPU devices using NVIDIA, AMD and Apple platforms, and 
+it demonstrates reasonable performance on GPUs, while on CPU the simillar [OpenMP implementation](https://github.com/hightower8083/chimera) is signifincantly faster.
+
+## Installation
+
+Given that **openCL** and **PyOpenCL** are installed (e.g. via `conda` or `pip`) and configured on your machine, you can install **SynchRad** in a standard way, i.e. by cloning the source 
+and running the `setup.py` script:
+```
+git clone https://github.com/hightower8083/synchrad.git
+cd synchrad/
+python setup.pu install
+```
+
+To be able to use the software with multiple GPU or CPU devices via MPI one should also install `mpi4py`. To output result in VTK format via `exportToVTK` method, the `tvtk.api` should be installed.
+
+## Usage
+
+A minimal example of **SynchRad** usage can be found in `example/` folder of this repository.  One common example would be to calculate radiation produced by the particles from, for example, a PIC simulations.
+In case if PIC softwer supports [OpenPMD standard](http://www.openpmd.org/#/start), this can be done with help of [openPMD-viewer](https://github.com/openPMD/openPMD-viewer), using the conversion method:
+```python
+from opmd_viewer import OpenPMDTimeSeries, ParticleTracker
+from synchrad.utils import tracksFromOPMD
+
+ts = LpaDiagnostics('./run/diags_track/hdf5/', check_all_files=False)
+ref_iteration = ts.iterations[-1]
+pt = ParticleTracker( ts, iteration=ref_iteration, 
+                      preserve_particle_index=True)
+
+tracksFromOPMD( ts, pt, ref_iteration=ref_iteration, fname='tracks.h5')
+```
+where one can see doc-lines of tracksFromOPMD for more optional arguments.
+
+The prepared track can be processed and saved to file using following commands:
+```
+import numpy as np
+import h5py
+from synchrad.calc import SynchRad
+
+file_tracks = h5py.File('./tracks.h5', mode='r')
+
+calc_input = {'grid':[ (1., 0.6e5),
+                       (0,0.04),
+                       (0.,2*np.pi),
+                       (256, 32, 32) ],
+              'timeStep':file_tracks['misc/cdt'][()],
+              'dtype':'double',
+              'ctx':'mpi',
+             }
+
+calc = SynchRad(calc_input)
+calc.calculate_spectrum(h5_file=file_tracks, comp='all')
+file_tracks.close()
+
+if calc.comm.rank==0:
+    file_spect = h5py.File('./spectrum.h5', mode='a')
+    file_spect['radiation'] = calc.Data['radiation']
+    file_spect.close()
+```
+where radiation within 40 urad angle is calculated for the energies range [0, 74.4 keV] is considered.
+
+For details on prost-processing one can see example in `example/`
+
+
+## Author and Contributions
+
+This software is developed by Igor A Andriyash (igor.andriyash@gmail.com) and is on its early stage of development. Everyone is welcome to contribute by testing and benchmerking the software, and 
+by implementing further optimizations and utility methods.
