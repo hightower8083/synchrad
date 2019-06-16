@@ -72,7 +72,7 @@ if calc.comm.rank==0:
     file_spect['radiation'] = calc.Data['radiation']
     file_spect.close()
 ```
-where radiation within 40 urad angle is calculated for the energies range [0, 74.4 keV] is considered.
+where radiation within 40 urad angle is calculated for the energies range [0, 74.4 keV].
 
 For details on prost-processing one can see example in `example/`
 
