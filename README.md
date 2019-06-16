@@ -47,7 +47,7 @@ tracksFromOPMD( ts, pt, ref_iteration=ref_iteration, fname='tracks.h5')
 where one can see doc-lines of tracksFromOPMD for more optional arguments.
 
 The prepared track can be processed and saved to file using following commands:
-```
+```python
 import numpy as np
 import h5py
 from synchrad.calc import SynchRad
