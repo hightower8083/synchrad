@@ -4,14 +4,16 @@
 ## Overview
 
 Tool to compute energy density of synchrotron radiation in the spectral volume using the Fourier transformed Lienard-Wiechert potentials (see eq. (14.65) of J.D.Jackson's _Classical electrodynamics_). 
-Software processes 3D (`x`, `y`, `z`, `px`, `py`, `pz`) trajectories of charged point-like particles with weights and maps the emmitied energy to the 3D spectral domain (`omega`, `theta`, `phi`). 
+
+Software processes 3D (_x_, _y_, _z_, _px_, _py_, _pz_) trajectories of charged point-like particles with _weights_,  and maps the emmitied energy to the 3D spectral domain (_omega_, _theta_, _phi_). 
 The package also contains number of convenience methods for pre- and post-proccessing.
 
 ### Language and hardware
 
-**SynchRad** is written in [openCL](https://www.khronos.org/opencl) and is interfaced with Python using [PyOpenCL](https://mathema.tician.de/software/pyopencl), also uses 
-[Mako](https://github.com/sqlalchemy/mako) template manager for tweaking with the data types. It was tested on GPU and CPU devices using NVIDIA, AMD and Apple platforms, and 
-it demonstrates reasonable performance on GPUs, while on CPU the simillar [OpenMP implementation](https://github.com/hightower8083/chimera) is signifincantly faster.
+**SynchRad** is written in [openCL](https://www.khronos.org/opencl) and is interfaced with Python via [PyOpenCL](https://mathema.tician.de/software/pyopencl). 
+
+Code also uses [Mako](https://github.com/sqlalchemy/mako) template manager for tweaking with the data types and _native_ functions. It was tested on GPU and CPU devices using NVIDIA, AMD and Apple platforms, and 
+it demonstrates a reasonable performance on GPUs, while on CPU the simillar [OpenMP implementation](https://github.com/hightower8083/chimera) is signifincantly faster.
 
 ## Installation
 
@@ -20,14 +22,16 @@ and running the `setup.py` script:
 ```
 git clone https://github.com/hightower8083/synchrad.git
 cd synchrad/
-python setup.pu install
+python setup.py install
 ```
 
 To be able to use the software with multiple GPU or CPU devices via MPI one should also install `mpi4py`. To output result in VTK format via `exportToVTK` method, the `tvtk.api` should be installed.
 
 ## Usage
 
-A minimal example of **SynchRad** usage can be found in `example/` folder of this repository.  One common example would be to calculate radiation produced by the particles from, for example, a PIC simulations.
+A minimal example of **SynchRad** usage can be found in `example/` folder of this repository.  
+
+Another common example would be to calculate radiation produced by the particles from, for example, a PIC simulations.
 In case if PIC softwer supports [OpenPMD standard](http://www.openpmd.org/#/start), this can be done with help of [openPMD-viewer](https://github.com/openPMD/openPMD-viewer), using the conversion method:
 ```python
 from opmd_viewer import OpenPMDTimeSeries, ParticleTracker
@@ -75,5 +79,6 @@ For details on prost-processing one can see example in `example/`
 
 ## Author and Contributions
 
-This software is developed by Igor A Andriyash (igor.andriyash@gmail.com) and is on its early stage of development. Everyone is welcome to contribute by testing and benchmerking the software, and 
-by implementing further optimizations and utility methods.
+This software is developed by Igor A Andriyash (igor.andriyash@gmail.com), and it is on the early stage of development.
+
+Everyone is welcome to contribute either by testing and benchmerking, or by intruducing further optimizations and adding utility methods.
