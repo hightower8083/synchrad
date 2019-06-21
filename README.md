@@ -64,11 +64,11 @@ calc_input = {'grid':[ (1., 0.6e5),
              }
 
 calc = SynchRad(calc_input)
-calc.calculate_spectrum(h5_file=file_tracks, comp='all')
+calc.calculate_spectrum(h5_file=file_tracks)
 file_tracks.close()
 
 if calc.comm.rank==0:
-    file_spect = h5py.File('./spectrum.h5', mode='a')
+    file_spect = h5py.File('./spectrum.h5', mode='w')
     file_spect['radiation'] = calc.Data['radiation']
     file_spect.close()
 ```
