@@ -5,8 +5,8 @@
 
 Tool to compute energy density of synchrotron radiation in the spectral volume using the Fourier transformed Lienard-Wiechert potentials (see eq. (14.65) of J.D.Jackson's _Classical electrodynamics_). 
 
-Software processes 3D (_x_, _y_, _z_, _px_, _py_, _pz_) trajectories of charged point-like particles with _weights_,  and maps the emmitied energy to the 3D spectral domain (_omega_, _theta_, _phi_). 
-The package also contains number of convenience methods for pre- and post-proccessing.
+This software processes the 3D (_x_, _y_, _z_, _px_, _py_, _pz_) trajectories of the charged point-like particles with _weights_,  and maps the emittied energy to the 3D spectral domain (_omega_, _theta_, _phi_). 
+The package also contains a number of convenience methods for pre- and post-proccessing.
 
 ### Language and hardware
 
