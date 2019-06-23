@@ -31,8 +31,8 @@ To be able to use the software with multiple GPU or CPU devices via MPI one shou
 
 A minimal example of **SynchRad** usage can be found in `example/` folder of this repository.  
 
-Another common example would be to calculate radiation produced by the particles from, for example, a PIC simulations.
-In case if PIC softwer supports [OpenPMD standard](http://www.openpmd.org/#/start), this can be done with help of [openPMD-viewer](https://github.com/openPMD/openPMD-viewer), using the conversion method:
+Another common example would be to calculate radiation produced by the particles from, for example, a PIC simulation.
+In case if PIC software supports output in [OpenPMD standard](http://www.openpmd.org/#/start), this can be done with help of [openPMD-viewer](https://github.com/openPMD/openPMD-viewer), using the conversion function:
 ```python
 from opmd_viewer import OpenPMDTimeSeries, ParticleTracker
 from synchrad.utils import tracksFromOPMD
@@ -74,11 +74,11 @@ if calc.comm.rank==0:
 ```
 where radiation within 40 urad angle is calculated for the energies range [0, 74.4 keV].
 
-For details on prost-processing one can see example in `example/`
+For details on post-processing, one can see the example notebook in `example/`
 
 
 ## Author and Contributions
 
 This software is developed by Igor A Andriyash (igor.andriyash@gmail.com), and it is on the early stage of development.
 
-Everyone is welcome to contribute either by testing and benchmerking, or by intruducing further optimizations and adding utility methods.
+Everyone is welcome to contribute either by testing and benchmerking, or by introducing further optimizations and adding utility methods.
