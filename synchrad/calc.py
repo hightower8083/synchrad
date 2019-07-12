@@ -362,7 +362,7 @@ class SynchRad(Utilities):
 
             self.plat_name = selected_dev.platform.vendor
             self.ocl_version = selected_dev.opencl_c_version
-        except LogicError:
+        except:
             self.dev_type = "Starting without"
             self.dev_name = ""
             self.plat_name = "None"
