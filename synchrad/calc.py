@@ -12,7 +12,6 @@ try:
 except (ImportError):
     mpi_installed = False
 
-
 src_path = src_path[0] + '/'
 
 
@@ -179,6 +178,9 @@ class SynchRad(Utilities):
 
     def _compile_kernels(self):
 
+        if self.plat_name is "None":
+            return
+
         agrs = {'my_dtype': self.Args['dtype'], 'f_native':self.f_native}
 
         fname = src_path
@@ -313,6 +315,9 @@ class SynchRad(Utilities):
 
         self.Data = {}
 
+        if self.plat_name is "None":
+            return
+
         gridNodeNums = tuple(self.Args['grid'][-1][::-1])
         self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
                                                 dtype=self.dtype )
@@ -347,15 +352,21 @@ class SynchRad(Utilities):
         else:
             ctx_kw_args['answers'] = self.Args['ctx']
 
-        self.ctx = cl.create_some_context(**ctx_kw_args)
-        self.queue = cl.CommandQueue(self.ctx)
+        try:
+            self.ctx = cl.create_some_context(**ctx_kw_args)
+            self.queue = cl.CommandQueue(self.ctx)
 
-        selected_dev = self.queue.device
-        self.dev_type = cl.device_type.to_string(selected_dev.type)
-        self.dev_name = self.queue.device.name
+            selected_dev = self.queue.device
+            self.dev_type = cl.device_type.to_string(selected_dev.type)
+            self.dev_name = self.queue.device.name
 
-        self.plat_name = selected_dev.platform.vendor
-        self.ocl_version = selected_dev.opencl_c_version
+            self.plat_name = selected_dev.platform.vendor
+            self.ocl_version = selected_dev.opencl_c_version
+        except LogicError:
+            self.dev_type = "Starting without"
+            self.dev_name = ""
+            self.plat_name = "None"
+            self.ocl_version = "None"
 
         msg = "  {} device: {}".format(self.dev_type, self.dev_name)
         if self.size>1:
