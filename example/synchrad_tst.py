@@ -54,7 +54,8 @@ calc_input = {'grid':[ (0.02*k_res,1.1*k_res),    # Wavenumber mapping region
                        (0.,2*np.pi),              # Rotation (phi) angle
                        (128, 32, 32) ],          # Corresponding resolutions
               'timeStep':dt,                      # normalized timestep
-              'dtype':'float',                   # precision (default is double)
+              #'dtype':'float',                   # precision (default is double)
+              #'native':1,                        # weather to try using device native functions (default no)
               #'ctx':'mpi',                        # OpenCL context (leave commented to be asked)
              }
 

@@ -193,12 +193,12 @@ class SynchRad(Utilities):
         self._mapper = cl.Program(self.ctx, src).build()
 
     def _set_global_working_group_size(self):
+        # self.WGS = self.ctx.devices[0].max_work_group_size
+
         if self.dev_type=='CPU':
             self.WGS = 32
         else:
             self.WGS = 256
-            # should be `self.ctx.devices[0].max_work_group_size`, but
-            # fails for some implementations
 
     def _get_wgs(self, Nelem):
         if Nelem <= self.WGS:
@@ -224,8 +224,8 @@ class SynchRad(Utilities):
             self.dtype = np.single
             self.f_native = 'native_'
 
-        if 'no_native' in self.Args:
-            self.f_native = ''
+        if 'native' in self.Args:
+            self.f_native = 'native_'
 
         if self.Args['dtype'] is 'float':
             if self.Args['mode'] is 'far':
