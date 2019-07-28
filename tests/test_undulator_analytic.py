@@ -9,10 +9,10 @@ K0 = 0.1           # Strength
 Periods = 50       # Number of periods
 
 # Particles and tracks characteristics
-Np = 10            # Number of particles
-g0 = 100.          # Mean Lorentz factor
-dg = 1e-4*g0       # Energy spread
-StepsPerPeriod=32  # Track temporal resolution
+Np = 24              # Number of particles
+g0 = 100.            # Mean Lorentz factor
+dg = 1e-4*g0         # Energy spread
+StepsPerPeriod = 32  # Track temporal resolution
 
 # Mean particles longitudinal velocity and central wavenumber
 gg = g0/(1.+K0**2/2)**.5
@@ -46,7 +46,6 @@ for g0_p in g0+dg*np.random.randn(Np):
 
     particleTracks.append( [x, y, z, ux, uy, uz, w] )
 
-
 # Define calculator input
 
 calc_input = {'grid':[ (0.02*k_res,1.1*k_res),    # Wavenumber mapping region
@@ -54,16 +53,15 @@ calc_input = {'grid':[ (0.02*k_res,1.1*k_res),    # Wavenumber mapping region
                        (0.,2*np.pi),              # Rotation (phi) angle
                        (128, 32, 32) ],          # Corresponding resolutions
               'timeStep':dt,                      # normalized timestep
-              #'dtype':'float',                   # precision (default is double)
-              #'native':1,                        # weather to try using device native functions (default no)
-              #'ctx':'mpi',                        # OpenCL context (leave commented to be asked)
+#             'ctx':'mpi',                        # OpenCL context (leave commented to be asked)
              }
 
+print("Running default mode with double precision")
 
 calc = SynchRad(calc_input)
 
 t0 = time.time()
-calc.calculate_spectrum(particleTracks, comp='total', Np_max=10)
+calc.calculate_spectrum(particleTracks.copy(), comp='total', Np_max=Np)
 if calc.rank==0:
     print('Done {:s}field spectrum from {:d} particle(s) in {:g} sec'\
           .format( calc.Args['mode'], Np,(time.time()-t0)))
@@ -72,3 +70,26 @@ if calc.rank==0:
     var = abs(energyModel - energyTheory)/energyTheory
 
     print("Deviation from analytic estimate is {:.2f}%".format(var*100))
+
+
+print("\nRunning light mode with single precision and native function support")
+
+calc.Args['dtype'] = 'float'
+calc.Args['native'] = True
+
+calc._init_args(calc.Args)
+calc._init_data()
+calc._compile_kernels()
+
+#calc = SynchRad(calc_input)
+t0 = time.time()
+calc.calculate_spectrum(particleTracks.copy(), comp='total', Np_max=Np)
+if calc.rank==0:
+    print('Done {:s}field spectrum from {:d} particle(s) in {:g} sec'\
+          .format( calc.Args['mode'], Np,(time.time()-t0)))
+    energyModel = calc.get_energy(lambda0_um=1)
+    energyTheory = Np * k_res*J_in_um*(7*np.pi/24)/137.*K0**2*(1+K0**2/2)*Periods
+    var = abs(energyModel - energyTheory)/energyTheory
+
+    print("Deviation from analytic estimate is {:.2f}%".format(var*100))
+

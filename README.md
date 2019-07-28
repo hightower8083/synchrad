@@ -81,4 +81,4 @@ For details on post-processing, one can see the example notebook in `example/`
 
 This software is developed by Igor A Andriyash (igor.andriyash@gmail.com), and it is on the early stage of development.
 
-Everyone is welcome to contribute either by testing and benchmerking, or by introducing further optimizations and adding utility methods.
+Everyone is welcome to contribute either by testing and benchmarking, or by introducing further optimizations and adding utility methods.

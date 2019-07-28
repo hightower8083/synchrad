@@ -181,7 +181,12 @@ class SynchRad(Utilities):
         if self.plat_name is "None":
             return
 
-        agrs = {'my_dtype': self.Args['dtype'], 'f_native':self.f_native}
+        agrs = {}
+        agrs['my_dtype'] = self.Args['dtype']
+        if 'native' in self.Args:
+            agrs['f_native'] = 'native_'
+        else:
+            agrs['f_native'] = ''
 
         fname = src_path
         if self.Args['mode'] is 'far':
@@ -219,13 +224,8 @@ class SynchRad(Utilities):
 
         if self.Args['dtype'] is 'double':
             self.dtype = np.double
-            self.f_native = ''
         elif self.Args['dtype'] is 'float':
             self.dtype = np.single
-            self.f_native = 'native_'
-
-        if 'native' in self.Args:
-            self.f_native = 'native_'
 
         if self.Args['dtype'] is 'float':
             if self.Args['mode'] is 'far':
