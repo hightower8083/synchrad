@@ -5,8 +5,8 @@
 
 Tool to compute energy density of synchrotron radiation in the spectral volume using the Fourier transformed Lienard-Wiechert potentials (see eq. (14.65) of J.D.Jackson's _Classical electrodynamics_). 
 
-Software processes 3D (_x_, _y_, _z_, _px_, _py_, _pz_) trajectories of charged point-like particles with _weights_,  and maps the emmitied energy to the 3D spectral domain (_omega_, _theta_, _phi_). 
-The package also contains number of convenience methods for pre- and post-proccessing.
+This software processes the 3D (_x_, _y_, _z_, _px_, _py_, _pz_) trajectories of the charged point-like particles with _weights_,  and maps the emittied energy to the 3D spectral domain (_omega_, _theta_, _phi_). 
+The package also contains a number of convenience methods for pre- and post-proccessing.
 
 ### Language and hardware
 
@@ -31,8 +31,8 @@ To be able to use the software with multiple GPU or CPU devices via MPI one shou
 
 A minimal example of **SynchRad** usage can be found in `example/` folder of this repository.  
 
-Another common example would be to calculate radiation produced by the particles from, for example, a PIC simulations.
-In case if PIC softwer supports [OpenPMD standard](http://www.openpmd.org/#/start), this can be done with help of [openPMD-viewer](https://github.com/openPMD/openPMD-viewer), using the conversion method:
+Another common example would be to calculate radiation produced by the particles from, for example, a PIC simulation.
+In case if PIC software supports output in [OpenPMD standard](http://www.openpmd.org/#/start), this can be done with help of [openPMD-viewer](https://github.com/openPMD/openPMD-viewer), using the conversion function:
 ```python
 from opmd_viewer import OpenPMDTimeSeries, ParticleTracker
 from synchrad.utils import tracksFromOPMD
@@ -64,21 +64,21 @@ calc_input = {'grid':[ (1., 0.6e5),
              }
 
 calc = SynchRad(calc_input)
-calc.calculate_spectrum(h5_file=file_tracks, comp='all')
+calc.calculate_spectrum(h5_file=file_tracks)
 file_tracks.close()
 
 if calc.comm.rank==0:
-    file_spect = h5py.File('./spectrum.h5', mode='a')
+    file_spect = h5py.File('./spectrum.h5', mode='w')
     file_spect['radiation'] = calc.Data['radiation']
     file_spect.close()
 ```
 where radiation within 40 urad angle is calculated for the energies range [0, 74.4 keV].
 
-For details on prost-processing one can see example in `example/`
+For details on post-processing, one can see the example notebook in `example/`
 
 
 ## Author and Contributions
 
 This software is developed by Igor A Andriyash (igor.andriyash@gmail.com), and it is on the early stage of development.
 
-Everyone is welcome to contribute either by testing and benchmerking, or by intruducing further optimizations and adding utility methods.
+Everyone is welcome to contribute either by testing and benchmarking, or by introducing further optimizations and adding utility methods.

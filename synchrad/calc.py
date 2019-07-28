@@ -9,9 +9,8 @@ from synchrad import __path__ as src_path
 try:
     from mpi4py import MPI
     mpi_installed = True
-except (ImportError,):
+except (ImportError):
     mpi_installed = False
-
 
 src_path = src_path[0] + '/'
 
@@ -33,10 +32,12 @@ class SynchRad(Utilities):
         self._init_data()
         self._compile_kernels()
 
-
     def calculate_spectrum( self, particleTracks=[],
-                            h5_file=None, comp='all',
+                            h5_file=None, comp='total',
                             Np_max=None, verbose=True ):
+
+        if comp in ('cartesian', 'spheric'):
+            self._reinit(all_comps=True)
 
         if h5_file is not None:
             particleTracks=[]
@@ -88,16 +89,28 @@ class SynchRad(Utilities):
         if mpi_installed:
             self._gather_result_mpi()
 
+    def _reinit(self, all_comps=False):
+        gridNodeNums = tuple(self.Args['grid'][-1][::-1])
+        if all_comps:
+            gridNodeNums = (3,) + gridNodeNums
+        self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
+                                              dtype=self.dtype )
+
     def _gather_result_mpi(self):
         buff = np.zeros_like(self.Data['radiation'])
         self.comm.barrier()
-        self.comm.Reduce([self.Data['radiation'].astype(np.double), MPI.DOUBLE],
+        self.comm.Reduce([self.Data['radiation'], MPI.DOUBLE],
                          [buff, MPI.DOUBLE])
         self.comm.barrier()
         self.Data['radiation'] = buff
 
     def _spectr_from_device(self):
-        self.Data['radiation'] = self.Data['radiation'].get().T
+        buff = self.Data['radiation'].get()
+        if len(buff.shape)>3:
+            buff = buff.swapaxes(-1,1)
+        else:
+            buff = buff.T
+        self.Data['radiation'] = np.ascontiguousarray(buff, dtype=np.double)
 
     def _track_to_device(self, particleTrack):
         x, y, z, ux, uy, uz, wp = particleTrack
@@ -144,13 +157,19 @@ class SynchRad(Utilities):
 
         args = args_track + args_axes + args_res + args_aux
 
-        if comp is 'all':
+        if comp is 'total':
             event = self._mapper.total( self.queue, (WGS_tot, ), (WGS, ),
                                          spect.data, *args )
+        elif comp is 'cartesian':
+            event = self._mapper.cartesian_comps( self.queue, (WGS_tot, ),
+                                                  (WGS, ), spect.data, *args )
+        elif comp is 'spheric':
+            event = self._mapper.spheric_comps( self.queue, (WGS_tot, ),
+                                                (WGS, ), spect.data, *args )
         else:
             args = [ np.uint32(compDict[comp]), ] + args
-            event = self._mapper.component( self.queue, (WGS_tot, ),
-                                            (WGS, ), spect.data, *args )
+            event = self._mapper.single_comp( self.queue, (WGS_tot, ),
+                                              (WGS, ), spect.data, *args )
 
         if return_event:
             return event
@@ -159,7 +178,15 @@ class SynchRad(Utilities):
 
     def _compile_kernels(self):
 
-        agrs = {'my_dtype': self.Args['dtype'], 'f_native':self.f_native}
+        if self.plat_name is "None":
+            return
+
+        agrs = {}
+        agrs['my_dtype'] = self.Args['dtype']
+        if 'native' in self.Args:
+            agrs['f_native'] = 'native_'
+        else:
+            agrs['f_native'] = ''
 
         fname = src_path
         if self.Args['mode'] is 'far':
@@ -171,12 +198,12 @@ class SynchRad(Utilities):
         self._mapper = cl.Program(self.ctx, src).build()
 
     def _set_global_working_group_size(self):
+        # self.WGS = self.ctx.devices[0].max_work_group_size
+
         if self.dev_type=='CPU':
             self.WGS = 32
         else:
             self.WGS = 256
-            # should be `self.ctx.devices[0].max_work_group_size`, but
-            # fails for some implementations
 
     def _get_wgs(self, Nelem):
         if Nelem <= self.WGS:
@@ -197,13 +224,8 @@ class SynchRad(Utilities):
 
         if self.Args['dtype'] is 'double':
             self.dtype = np.double
-            self.f_native = ''
         elif self.Args['dtype'] is 'float':
             self.dtype = np.single
-            self.f_native = 'native_'
-
-        if 'no_native' in self.Args:
-            self.f_native = ''
 
         if self.Args['dtype'] is 'float':
             if self.Args['mode'] is 'far':
@@ -231,6 +253,9 @@ class SynchRad(Utilities):
         if 'wavelengthGrid' in self.Args['Features']:
             self.Args['wavelengths'] = np.r_[1./omega_max:1./omega_min:No*1j]
             omega = 1./self.Args['wavelengths']
+        elif 'logGrid' in self.Args['Features']:
+            d_log_w = np.log(omega_max/omega_min) / (No-1.0)
+            omega = omega_min * np.exp( d_log_w*np.arange(No)  )
         else:
             omega = np.r_[omega_min:omega_max:No*1j]
 
@@ -286,13 +311,12 @@ class SynchRad(Utilities):
             self.Args['radius'] = radius.astype(self.dtype)
             self.Args['dV'] = self.Args['dw']*self.Args['dr']*self.Args['dph']
 
-    def reinit(self):
-        gridNodeNums = tuple(self.Args['grid'][-1][::-1])
-        self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
-                                              dtype=self.dtype )
     def _init_data(self):
 
         self.Data = {}
+
+        if self.plat_name is "None":
+            return
 
         gridNodeNums = tuple(self.Args['grid'][-1][::-1])
         self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
@@ -328,15 +352,21 @@ class SynchRad(Utilities):
         else:
             ctx_kw_args['answers'] = self.Args['ctx']
 
-        self.ctx = cl.create_some_context(**ctx_kw_args)
-        self.queue = cl.CommandQueue(self.ctx)
+        try:
+            self.ctx = cl.create_some_context(**ctx_kw_args)
+            self.queue = cl.CommandQueue(self.ctx)
 
-        selected_dev = self.queue.device
-        self.dev_type = cl.device_type.to_string(selected_dev.type)
-        self.dev_name = self.queue.device.name
+            selected_dev = self.queue.device
+            self.dev_type = cl.device_type.to_string(selected_dev.type)
+            self.dev_name = self.queue.device.name
 
-        self.plat_name = selected_dev.platform.vendor
-        self.ocl_version = selected_dev.opencl_c_version
+            self.plat_name = selected_dev.platform.vendor
+            self.ocl_version = selected_dev.opencl_c_version
+        except:
+            self.dev_type = "Starting without"
+            self.dev_name = ""
+            self.plat_name = "None"
+            self.ocl_version = "None"
 
         msg = "  {} device: {}".format(self.dev_type, self.dev_name)
         if self.size>1:
