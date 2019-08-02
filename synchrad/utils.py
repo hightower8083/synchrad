@@ -4,6 +4,7 @@ from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 import h5py
+from numba import jit
 
 try:
     from tvtk.api import tvtk, write_data
@@ -13,6 +14,16 @@ except (ImportError,):
 
 J_in_um = 2e6*np.pi*hbar*c
 
+@jit(nopython=True)
+def record_particles(tracks, nsteps, x, y, z, ux, uy, uz, Np_select):
+    for ip_glob in range(Np_select):
+        if np.isnan(x[ip_glob]): continue
+        point = [ x[ip_glob], y[ip_glob], z[ip_glob],
+                  ux[ip_glob], uy[ip_glob], uz[ip_glob] ]
+
+        tracks[nsteps[ip_glob], ip_glob, :] = point
+        nsteps[ip_glob] += 1
+    return tracks, nsteps
 
 class Utilities:
 
@@ -176,9 +187,9 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Nit_min=None,
 
     w_select, = ts.get_particle(var_list=['w',], select=pt,
                                 iteration=ref_iteration )
-    w_select = w_select[::dNp]
     Np = pt.N_selected
     Np_select = Np//dNp
+    w_select = w_select[:Np_select]
 
     iterations = ts.iterations.copy()
     filter = np.ones_like(iterations)
@@ -193,24 +204,17 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Nit_min=None,
 
     dt = (ts.t[1] - ts.t[0]) * c * 1e6 # in microns as coordinates
 
-    tracks = np.zeros( (Np_select, 6, Nt), dtype=np.double )
+    tracks = np.zeros( (Nt, Np_select, 6), dtype=np.double )
     nsteps = np.zeros( Np_select, dtype=np.int )
 
     for it, iteration in enumerate(iterations):
-        x, y, z, ux, uy, uz, w = ts.get_particle(
-            var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'w'],
+        x, y, z, ux, uy, uz = ts.get_particle(
+            var_list=['x', 'y', 'z', 'ux', 'uy', 'uz'],
             select=pt, iteration=iteration )
 
-        if w.shape[0] < Np: continue
-        for ip_select in range(Np_select):
-            ip_glob = ip_select*dNp
-            if np.isnan(x[ip_glob]): continue
-            point = [ x[ip_glob], y[ip_glob], z[ip_glob],
-                      ux[ip_glob], uy[ip_glob], uz[ip_glob] ]
-
-            tracks[ip_select, :, nsteps[ip_select]] = point
-            nsteps[ip_select] += 1
-
+        if x.size < Np: continue
+        tracks, nsteps = record_particles(tracks, nsteps, x, y, z, 
+                                          ux, uy, uz, Np_select)
         if verbose:
             print( "Done {:0.1f}%".format(it/len(iterations) * 100),
                    end='\r', flush=True)
@@ -218,8 +222,8 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Nit_min=None,
     if fname is not None:
         f = h5py.File(fname, mode='w')
         i_tr = 0
-        for ip, track in enumerate(tracks):
-            x, y, z, ux, uy, uz = track
+        for ip in range(tracks.shape[1]):
+            x, y, z, ux, uy, uz = tracks[:,ip,:].T
             if nsteps[ip]>8 :
                 f[f'tracks/{i_tr:d}/x'] = x[:nsteps[ip]]
                 f[f'tracks/{i_tr:d}/y'] = y[:nsteps[ip]]
@@ -237,12 +241,12 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Nit_min=None,
         return
     else:
         particleTracks = []
-        for ip, track in enumerate(tracks):
-            x, y, z, ux, uy, uz = track
+        for ip in range(tracks.shape[1]):
+            x, y, z, ux, uy, uz = tracks[:,ip,:].T
             if nsteps[ip]<8 :  continue
             particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]],
                                     z[:nsteps[ip]], ux[:nsteps[ip]],
                                     uy[:nsteps[ip]], uz[:nsteps[ip]],
-                                    w_select[ip]] )
+                                    w_select[ip], ] )
 
         return particleTracks, dt
