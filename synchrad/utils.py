@@ -29,10 +29,45 @@ def record_particles_step(tracks, nsteps, x, y, z, ux, uy, uz, id,
     return tracks, nsteps
 
 @njit
-def record_particles_first(tracks, nsteps, x, y, z, ux, uy, uz, id, Np_select):
+def record_particles_step_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
+                          Np_select, dNp, maxR2):
+    for ip in range(Np_select):
+        ip_glob = ip*dNp
+        x_loc = x[ip_glob]
+        y_loc = y[ip_glob]
+        if np.isnan(x_loc): continue
+        if (x_loc*x_loc+y_loc*y_loc>maxR2) : continue
+
+        point = [ x_loc, y_loc, z[ip_glob],
+                  ux[ip_glob], uy[ip_glob], uz[ip_glob],
+                  id[ip_glob] ]
+
+        tracks[nsteps[ip], ip, :] = point
+        nsteps[ip] += 1
+    return tracks, nsteps
+
+@njit
+def record_particles_first(tracks, nsteps, x, y, z, ux, uy, uz, id,
+                           Np_select):
     for ip in range(Np_select):
         if np.isnan(x[ip]): continue
         point = [ x[ip], y[ip], z[ip],
+                  ux[ip], uy[ip], uz[ip], id[ip] ]
+
+        tracks[nsteps[ip], ip, :] = point
+        nsteps[ip] += 1
+    return tracks, nsteps
+
+
+@njit
+def record_particles_first_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
+                                Np_select, maxR2):
+    for ip in range(Np_select):
+        x_loc = x[ip]
+        y_loc = y[ip]
+        if np.isnan(x_loc): continue
+        if (x_loc*x_loc+y_loc*y_loc>maxR2) : continue
+        point = [ x_loc, y_loc, z[ip],
                   ux[ip], uy[ip], uz[ip], id[ip] ]
 
         tracks[nsteps[ip], ip, :] = point
@@ -196,19 +231,26 @@ class Utilities:
         spc_vtk.point_data.scalars.name = scalar_name
         write_data(spc_vtk, filename)
 
-def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Np_select=None,
+def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
+                   dNp=None, Np_select=None, maxRaduis=None,
                    Nit_min=None, Nit_max=None, verbose=True):
 
+    Np = pt.N_selected
     w_select, = ts.get_particle(var_list=['w',], select=pt,
                                 iteration=ref_iteration )
 
     if (Np_select is None) and (dNp is None):
-        print('Either Np_select or dNp should be selected')
+        print('Either Np_select or dNp can be used. Choosing all particles.')
+        Np_select = w_select.size
 
-    if dNp is None:
+    if (Np_select is not None) and (dNp is not None):
+        print("Only one of Np_select and dNp can be used. Stopping here.")
+        return
+
+    if Np_select is not None:
         w_select = w_select[:Np_select]
 
-    if Np_select is None:
+    if dNp is not None:
         w_select = w_select[::dNp]
         Np_select = w_select.size
 
@@ -234,17 +276,26 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, dNp=1, Np_select=None,
             select=pt, iteration=iteration )
 
         if x.size < Np: continue
-        if dNp is None:
-            tracks, nsteps = record_particles_first(tracks, nsteps, x, y, z,
-                                              ux, uy, uz, id, Np_select)
-        elif Np_select is None:
-            tracks, nsteps = record_particles_step(tracks, nsteps, x, y, z,
-                                              ux, uy, uz, id, Np_select, dNp)
+        if Np_select is not None:
+            if maxRaduis is None:
+                tracks, nsteps = record_particles_first(tracks, nsteps,
+                    x, y, z, ux, uy, uz, id, Np_select)
+            else:
+                tracks, nsteps = record_particles_first_limR2(tracks, nsteps,
+                    x, y, z, ux, uy, uz, id, Np_select, maxRaduis**2)
+        elif dNp is not None:
+            if maxRaduis is None:
+                tracks, nsteps = record_particles_step(tracks, nsteps,
+                    x, y, z, ux, uy, uz, id, Np_select, dNp)
+            else:
+                tracks, nsteps = record_particles_step_limR2(tracks, nsteps,
+                    x, y, z, ux, uy, uz, id, Np_select, dNp, maxRaduis**2)
 
         if verbose:
-            print( "Done {:0.1f}%".format(it/len(iterations) * 100),
+            print( f"Done {it/len(iterations)*100: 0.1f}%",
                    end='\r', flush=True)
 
+    if verbose: print( f"Done reading {Np_select} particles")
     if fname is not None:
         f = h5py.File(fname, mode='w')
         i_tr = 0
