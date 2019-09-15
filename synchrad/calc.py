@@ -322,6 +322,7 @@ class SynchRad(Utilities):
         self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
                                                 dtype=self.dtype )
 
+        # Note that dw is not multiplied by 2*pi
         self.Data['omega'] = arrcl.to_device( self.queue,
                                  self.dtype(2*np.pi)*self.Args['omega'] )
 
@@ -349,24 +350,30 @@ class SynchRad(Utilities):
         elif self.Args['ctx'] is 'mpi':
             # temporal definition, assumes default 0th platform
             ctx_kw_args['answers'] = [0, self.rank]
-        else:
+        elif self.Args['ctx'] is not False:
             ctx_kw_args['answers'] = self.Args['ctx']
 
-        try:
-            self.ctx = cl.create_some_context(**ctx_kw_args)
-            self.queue = cl.CommandQueue(self.ctx)
-
-            selected_dev = self.queue.device
-            self.dev_type = cl.device_type.to_string(selected_dev.type)
-            self.dev_name = self.queue.device.name
-
-            self.plat_name = selected_dev.platform.vendor
-            self.ocl_version = selected_dev.opencl_c_version
-        except:
+        if self.Args['ctx'] is False:
             self.dev_type = "Starting without"
             self.dev_name = ""
             self.plat_name = "None"
             self.ocl_version = "None"
+        else:
+            try:
+                self.ctx = cl.create_some_context(**ctx_kw_args)
+                self.queue = cl.CommandQueue(self.ctx)
+
+                selected_dev = self.queue.device
+                self.dev_type = cl.device_type.to_string(selected_dev.type)
+                self.dev_name = self.queue.device.name
+
+                self.plat_name = selected_dev.platform.vendor
+                self.ocl_version = selected_dev.opencl_c_version
+            except:
+                self.dev_type = "Starting without"
+                self.dev_name = ""
+                self.plat_name = "None"
+                self.ocl_version = "None"
 
         msg = "  {} device: {}".format(self.dev_type, self.dev_name)
         if self.size>1:
