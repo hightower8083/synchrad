@@ -1,51 +1,42 @@
+import logging
+
 import numpy as np
+import xarray as xr
 from matplotlib import pyplot
 
 from undulator.api import undulator_spectrum
-import xarray as xr
-
-import logging
 
 logging.basicConfig(
     format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S", level=logging.INFO
 )
 
 
-def analytic_check(spectrum):
-    analytical_spectrum = spectrum.energy_analytical()
-    energy_model = spectrum.synch_rad.get_energy(lambda0_um=1.0)
+def analytic_check(some_spectrum):
+    analytical_spectrum = some_spectrum.energy_analytical()
+    energy_model = some_spectrum.synch_rad.get_energy(lambda0_um=1.0)
     var = abs(energy_model - analytical_spectrum) / analytical_spectrum
     logging.info(f"Deviation from analytic estimate is {100 * var:.2f}")
 
 
 if __name__ == "__main__":
-    spectrum = undulator_spectrum(number_of_particles=10)
+    spectrum = undulator_spectrum(number_of_particles=10, opencl_context=(0,))
     analytic_check(spectrum)
 
-    logging.info("Plotting the particle trajectories")
-    _, ax = pyplot.subplots(figsize=(10, 2))
+    _, ax = pyplot.subplots()
     for particle in spectrum:
-        ax.plot(
-            particle.track.z,
-            particle.track.x * 1e6,
-            color="gray",
-            linewidth=0.2,
-            alpha=0.7,
-        )
-    ax.set(xlabel="z", ylabel="x [mum]")
+        ax.plot(particle.track.z, particle.track.x * 1e6, alpha=0.7)
+    ax.set(xlabel="z", ylabel="x [mum]", title="Particle trajectories")
 
-    logging.info("Plotting the spot observed with a band-filter")
     k_filter = 0.93 * spectrum.central_wavenumber
     k_band = 0.003 * k_filter
     k = spectrum.grid.k[:, np.newaxis, np.newaxis]
-    filter = np.exp(-(k - k_filter) ** 2 / k_band ** 2)
+    band_pass = np.exp(-(k - k_filter) ** 2 / k_band ** 2)
 
-    # the SynchRad class should return xarray objects, complete with axes and attached units, as shown below
-    # then the user can do data processing on these objects, and plot them via different backends,
-    # convert to numpy arrays etc. xarray also supports dask for chunk processing of large arrays
-    # TODO: refactor, no clue what this line is doing
+    # If the SynchRad class would return xarray objects, complete with axes and attached units, as shown below
+    # then the user could do data processing on these objects, and plot them via different backends,
+    # convert to numpy arrays etc. Xarray also supports dask for chunk processing of large arrays.
     spot, extent = spectrum.synch_rad.get_spot_cartesian(
-        bins=(600, 600), lambda0_um=2e4, th_part=0.2, spect_filter=filter
+        bins=(600, 600), lambda0_um=2e4, th_part=0.2, spect_filter=band_pass
     )
     spotxr = xr.DataArray(
         spot,
@@ -61,8 +52,8 @@ if __name__ == "__main__":
     #
     pyplot.figure()
     spotxr.plot(cmap=pyplot.cm.nipy_spectral)
+    pyplot.gca().set(title="Band-filtered spot")
 
-    logging.info("Plotting the far-field radiation spectrum")
     radiation = xr.DataArray(
         spectrum.synch_rad.Data["radiation"],
         dims=["k", "theta", "phi"],
@@ -78,3 +69,4 @@ if __name__ == "__main__":
     radiation_k_theta = radiation.mean(dim="phi", keep_attrs=True).transpose()
     pyplot.figure()
     radiation_k_theta.plot()
+    pyplot.gca().set(title="Far-field radiation some_spectrum")

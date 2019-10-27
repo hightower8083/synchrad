@@ -75,6 +75,7 @@ class SynchRadInput:
 
     dtype = attr.ib(default="float")
     native = attr.ib(default=True)
+    ctx = attr.ib(default=[0])
 
     def asdict(self):
         return attr.asdict(self)
@@ -91,6 +92,7 @@ class Undulator:
         resolution=Resolution(k=512, theta=256, phi=36),
         dtype="float",
         native=True,
+        opencl_context=(0,),
     ):
         self.strength = strength
 
@@ -116,7 +118,11 @@ class Undulator:
             resolution=resolution,
         )
         self.spectrum_input = SynchRadInput(
-            grid=self.grid.aslist(), timeStep=self.time_step, dtype=dtype, native=native
+            grid=self.grid.aslist(),
+            timeStep=self.time_step,
+            dtype=dtype,
+            native=native,
+            ctx=opencl_context,
         ).asdict()
 
         self.synch_rad = None
@@ -193,12 +199,14 @@ def undulator_spectrum(
     resolution=Resolution(k=512, theta=256, phi=36),
     dtype="float",
     native=True,
+    opencl_context=(0,),
 ):
     u = Undulator(
         number_of_particles=number_of_particles,
         resolution=resolution,
         dtype=dtype,
         native=native,
+        opencl_context=opencl_context,
     )
     synch_rad = SynchRad(u.spectrum_input)
 
