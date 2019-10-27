@@ -2,14 +2,18 @@ import numpy as np
 from matplotlib import pyplot
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from example.undulator.api import undulator_spectrum
+from undulator.api import undulator_spectrum
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def analytic_check(spectrum):
     analytical_spectrum = spectrum.energy_analytical()
     energy_model = spectrum.synch_rad.get_energy(lambda0_um=1.0)
     var = abs(energy_model - analytical_spectrum) / analytical_spectrum
-    print(f"Deviation from analytic estimate is {100 * var:.2f}")
+    logging.debug(f"Deviation from analytic estimate is {100 * var:.2f}")
 
 
 if __name__ == "__main__":
