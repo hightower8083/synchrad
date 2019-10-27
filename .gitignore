@@ -16,3 +16,4 @@ synchrad.egg-info/
 *.h5
 .idea/
 *.png
+*.npz
