@@ -12,10 +12,7 @@ dist/
 synchrad.egg-info/
 .cache/
 .eggs/
-<<<<<<< Updated upstream
-=======
 
 *.h5
 .idea/
 *.png
->>>>>>> Stashed changes
