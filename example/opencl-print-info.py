@@ -5,6 +5,19 @@ Note that pyopencl has a script that prints all properties in its examples folde
 
 import pyopencl as cl
 
+import math
+
+
+def convert_size(size_bytes):
+    if size_bytes == 0:
+        return "0B"
+    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return "%s %s" % (s, size_name[i])
+
+
 print("PyOpenCL version: " + cl.VERSION_TEXT)
 print("OpenCL header version: " + ".".join(map(str, cl.get_cl_header_version())) + "\n")
 
@@ -20,7 +33,6 @@ for plat in platforms:
     indent = "\t"
     print(indent + "Version: " + plat.version)
     print(indent + "Profile: " + plat.profile)
-    print(indent + "Extensions: " + str(plat.extensions.strip().split(" ")))
 
     # Get and print device info
     devices = plat.get_devices(cl.device_type.ALL)
@@ -37,16 +49,8 @@ for plat in platforms:
         flags = [
             ("Version", dev.version),
             ("Type", cl.device_type.to_string(dev.type)),
-            ("Extensions", str(dev.extensions.strip().split(" "))),
-            ("Memory (global)", str(dev.global_mem_size)),
-            ("Memory (local)", str(dev.local_mem_size)),
-            ("Address bits", str(dev.address_bits)),
-            ("Max work item dims", str(dev.max_work_item_dimensions)),
-            ("Max work group size", str(dev.max_work_group_size)),
-            ("Max compute units", str(dev.max_compute_units)),
-            ("Driver version", dev.driver_version),
-            ("Image support", str(bool(dev.image_support))),
-            ("Little endian", str(bool(dev.endian_little))),
+            ("Memory (global)", convert_size(dev.global_mem_size)),
+            ("Memory (local)", convert_size(dev.local_mem_size)),
             ("Device available", str(bool(dev.available))),
             ("Compiler available", str(bool(dev.compiler_available))),
         ]
