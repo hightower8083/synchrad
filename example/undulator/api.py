@@ -39,6 +39,26 @@ class Grid:
     phi_range = attr.ib()
     resolution = attr.ib(default=Resolution())
 
+    k = attr.ib()
+
+    @k.default
+    def _k(self):
+        return np.linspace(self.k_range[0], self.k_range[1], self.resolution.k)
+
+    theta = attr.ib()
+
+    @theta.default
+    def _theta(self):
+        return np.linspace(
+            self.theta_range[0], self.theta_range[1], self.resolution.theta
+        )
+
+    phi = attr.ib()
+
+    @phi.default
+    def _phi(self):
+        return np.linspace(self.phi_range[0], self.phi_range[1], self.resolution.phi)
+
     def aslist(self):
         return [
             self.k_range,
