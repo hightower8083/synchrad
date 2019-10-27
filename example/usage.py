@@ -22,7 +22,19 @@ if __name__ == "__main__":
     spectrum = undulator_spectrum(number_of_particles=10)
     analytic_check(spectrum)
 
-    # Plot the spot observed with a band-filter
+    logging.info("Plotting the particle trajectories")
+    _, ax = pyplot.subplots(figsize=(10, 2))
+    for particle in spectrum:
+        ax.plot(
+            particle.track.z,
+            particle.track.x * 1e6,
+            color="gray",
+            linewidth=0.2,
+            alpha=0.7,
+        )
+    ax.set(xlabel="z", ylabel="x [mum]")
+
+    logging.info("Plotting the spot observed with a band-filter")
     k_filter = 0.93 * spectrum.central_wavenumber
     k_band = 0.003 * k_filter
     k = spectrum.grid.k[:, np.newaxis, np.newaxis]
@@ -50,6 +62,7 @@ if __name__ == "__main__":
     pyplot.figure()
     spotxr.plot(cmap=pyplot.cm.nipy_spectral)
 
+    logging.info("Plotting the far-field radiation spectrum")
     radiation = xr.DataArray(
         spectrum.synch_rad.Data["radiation"],
         dims=["k", "theta", "phi"],
