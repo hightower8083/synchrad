@@ -4,7 +4,7 @@ import numpy as np
 import xarray as xr
 from matplotlib import pyplot
 
-from undulator.api import undulator_spectrum
+from undulator.api import undulator_spectrum, Resolution
 
 logging.basicConfig(
     format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S", level=logging.INFO
@@ -19,22 +19,29 @@ def analytic_check(some_spectrum):
 
 
 if __name__ == "__main__":
-    spectrum = undulator_spectrum(number_of_particles=10, opencl_context=(0,))
+    # compute undulator spectrum
+    spectrum = undulator_spectrum(
+        number_of_particles=10, opencl_context=(0,), resolution=Resolution(phi=32)
+    )
+
+    # compare with analytic result
     analytic_check(spectrum)
 
+    # plot particle trajectories
     _, ax = pyplot.subplots()
     for particle in spectrum:
         ax.plot(particle.track.z, particle.track.x * 1e6, alpha=0.7)
-    ax.set(xlabel="z", ylabel="x [mum]", title="Particle trajectories")
+    ax.set(xlabel="z", ylabel=r"x [$\mu$m]", title="Particle trajectories")
 
+    # plot radiation spot in real space
     k_filter = 0.93 * spectrum.central_wavenumber
     k_band = 0.003 * k_filter
     k = spectrum.grid.k[:, np.newaxis, np.newaxis]
     band_pass = np.exp(-(k - k_filter) ** 2 / k_band ** 2)
 
-    # If the SynchRad class would return xarray objects, complete with axes and attached units, as shown below
+    # if the SynchRad class would return xarray objects, complete with axes and attached units, as shown below
     # then the user could do data processing on these objects, and plot them via different backends,
-    # convert to numpy arrays etc. Xarray also supports dask for chunk processing of large arrays.
+    # convert to numpy arrays etc. xarray also supports dask for chunk processing of large arrays.
     spot, extent = spectrum.synch_rad.get_spot_cartesian(
         bins=(600, 600), lambda0_um=2e4, th_part=0.2, spect_filter=band_pass
     )
@@ -54,6 +61,7 @@ if __name__ == "__main__":
     spotxr.plot(cmap=pyplot.cm.nipy_spectral)
     pyplot.gca().set(title="Band-filtered spot")
 
+    # plot far-field spectrum
     radiation = xr.DataArray(
         spectrum.synch_rad.Data["radiation"],
         dims=["k", "theta", "phi"],
@@ -62,11 +70,11 @@ if __name__ == "__main__":
         ),
         attrs=dict(long_name="radiation", units="units"),
     )
-    radiation.k.attrs["units"] = "k units"
+    radiation.k.attrs["units"] = "units"
     radiation.theta.attrs["units"] = "rad"
     radiation.phi.attrs["units"] = "rad"
 
     radiation_k_theta = radiation.mean(dim="phi", keep_attrs=True).transpose()
     pyplot.figure()
     radiation_k_theta.plot()
-    pyplot.gca().set(title="Far-field radiation some_spectrum")
+    pyplot.gca().set(title="Far-field radiation spectrum")
