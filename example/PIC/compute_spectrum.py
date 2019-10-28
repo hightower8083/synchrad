@@ -10,7 +10,7 @@ if __name__ == "__main__":
         "timeStep": file_tracks["misc/cdt"][()],
         "dtype": "double",
         "native": True,
-        "ctx": [0],
+        "ctx": "mpi",
     }
 
     calc = SynchRad(calc_input)
