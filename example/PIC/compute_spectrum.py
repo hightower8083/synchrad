@@ -7,11 +7,13 @@ if __name__ == "__main__":
         time_step = f["misc/cdt"][...]
 
     calc_input = {
-        "grid": [(1.0, 0.6e5), (0, 0.04), (0.0, 2 * np.pi), (256, 32, 32)],
+        "grid": [(10, 1.2e4), (0, 0.03), (0.0, 2 * np.pi), (256, 36, 36)],
         "timeStep": time_step,
         "dtype": "double",
-        "native": True,
+        "native": False,
+        "ctx": None,
     }
+
     calc = SynchRad(calc_input)
 
     with h5py.File("tracks.h5", "r") as f:

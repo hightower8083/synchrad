@@ -64,13 +64,13 @@ dt = (zmax - zmin) / Nz / c  # Timestep (seconds)
 p_zmin = 30.0e-6  # Position of the beginning of the plasma (meters)
 p_zmax = 500.0e-6  # Position of the end of the plasma (meters)
 p_rmax = 18.0e-6  # Maximal radial position of the plasma (meters)
-n_e = 4.0e18 * 1.0e6  # Density (electrons.meters^-3)
+n_e = 3.0e19 * 1.0e6  # Density (electrons.meters^-3)
 p_nz = 2  # Number of particles per cell along z
 p_nr = 2  # Number of particles per cell along r
 p_nt = 4  # Number of particles per cell along theta
 
 # The laser
-a0 = 4.0  # Laser amplitude
+a0 = 6.5  # Laser amplitude
 w0 = 5.0e-6  # Laser waist
 ctau = 5.0e-6  # Laser duration
 z0 = 15.0e-6  # Laser centroid
@@ -79,31 +79,22 @@ z0 = 15.0e-6  # Laser centroid
 v_window = c  # Speed of the window
 
 # The diagnostics and the checkpoints/restarts
-diag_period = 50  # Period of the diagnostics in number of timesteps
-diag_period_track = 10  # Period of the electron track diagnostics, in nr of timesteps
+diag_period = 1000  # Period of the diagnostics in number of timesteps
+diag_period_track = 2  # Period of the electron track diagnostics, in nr of timesteps
 save_checkpoints = False  # Whether to write checkpoint files
 checkpoint_period = 100  # Period for writing the checkpoints
 use_restart = False  # Whether to restart from a previous checkpoint
 track_electrons = True  # Whether to track and write particle ids
 
 # The density profile
-ramp_start = 30.0e-6
-ramp_length = 40.0e-6
-
-
 def dens_func(z, r):
     """Returns relative density at position z and r"""
-    # Allocate relative density
-    n = np.ones_like(z)
-    # Make linear ramp
-    n = np.where(z < ramp_start + ramp_length, (z - ramp_start) / ramp_length, n)
-    # Supress density before the ramp
-    n = np.where(z < ramp_start, 0.0, n)
+    n = np.interp(z, [0, 40e-6, 60e-6, 80e-6], [0, 1, 1, 0.7], left=0, right=0.7)
     return n
 
 
 # The interaction length of the simulation (meters)
-L_interact = 50.0e-6  # increase to simulate longer distance!
+L_interact = 300.0e-6  # increase to simulate longer distance!
 # Interaction time (seconds) (to calculate number of PIC iterations)
 T_interact = (L_interact + (zmax - zmin)) / v_window
 # (i.e. the time it takes for the moving window to slide across the plasma)
@@ -161,12 +152,11 @@ if __name__ == "__main__":
 
     # Add diagnostics
     sim.diags = [
-        FieldDiagnostic(diag_period, sim.fld, comm=sim.comm, fieldtypes=["E"]),
-        ParticleChargeDensityDiagnostic(diag_period, sim, {"electrons": elec}),
+        FieldDiagnostic(diag_period, sim.fld, comm=sim.comm, fieldtypes=["E", "rho"]),
         ParticleDiagnostic(
             diag_period_track,
             {"electrons": elec},
-            select={"uz": [1.0, None]},
+            select={"uz": [40.0, None]},
             comm=sim.comm,
             write_dir="./diags_track",
         ),

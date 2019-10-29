@@ -9,4 +9,7 @@ if __name__ == "__main__":
     ref_iteration = ts.iterations[-1]
 
     pt = ParticleTracker(ts, iteration=ref_iteration, preserve_particle_index=True)
-    tracksFromOPMD(ts, pt, ref_iteration=ref_iteration, fname="tracks.h5")
+
+    tracksFromOPMD(
+        ts, pt, ref_iteration=ref_iteration, Np_select=1000, fname="tracks.h5"
+    )
