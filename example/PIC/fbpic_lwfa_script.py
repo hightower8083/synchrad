@@ -28,7 +28,6 @@ from fbpic.openpmd_diag import (
     ParticleDiagnostic,
     set_periodic_checkpoint,
     restart_from_checkpoint,
-    ParticleChargeDensityDiagnostic,
 )
 
 # ----------
