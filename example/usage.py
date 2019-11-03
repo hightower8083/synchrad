@@ -21,7 +21,7 @@ def analytic_check(some_spectrum):
 if __name__ == "__main__":
     # compute undulator spectrum
     spectrum = undulator_spectrum(
-        number_of_particles=10, opencl_context=(0,), resolution=Resolution(phi=32)
+        number_of_particles=10, opencl_context=None, resolution=Resolution(phi=32)
     )
 
     # compare with analytic result

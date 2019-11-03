@@ -92,7 +92,7 @@ class Undulator:
         resolution=Resolution(k=512, theta=256, phi=36),
         dtype="float",
         native=True,
-        opencl_context=(0,),
+        opencl_context=None,
     ):
         self.strength = strength
 
@@ -199,7 +199,7 @@ def undulator_spectrum(
     resolution=Resolution(k=512, theta=256, phi=36),
     dtype="float",
     native=True,
-    opencl_context=(0,),
+    opencl_context=None,
 ):
     u = Undulator(
         number_of_particles=number_of_particles,
