@@ -12,3 +12,8 @@ dist/
 synchrad.egg-info/
 .cache/
 .eggs/
+
+*.h5
+.idea/
+*.png
+*.npz
