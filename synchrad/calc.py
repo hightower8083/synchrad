@@ -34,10 +34,10 @@ class SynchRad(Utilities):
 
     def calculate_spectrum( self, particleTracks=[],
                             h5_file=None, comp='total',
-                            Np_max=None, verbose=True ):
+                            Np_max=None, nSnaps=1,
+                            verbose=True ):
 
-        if comp in ('cartesian', 'spheric'):
-            self._reinit(all_comps=True)
+        self._init_raditaion(comp, nSnaps)
 
         if h5_file is not None:
             particleTracks=[]
@@ -78,7 +78,7 @@ class SynchRad(Utilities):
             itr = 0
             for track in particleTracks:
                 track = self._track_to_device(track)
-                self._process_track(track, comp=comp)
+                self._process_track(track, comp, nSnaps)
                 itr += 1
                 if self.rank==0 and verbose:
                     progress = itr/len(particleTracks) * 100
@@ -88,13 +88,6 @@ class SynchRad(Utilities):
         self._spectr_from_device()
         if mpi_installed:
             self._gather_result_mpi()
-
-    def _reinit(self, all_comps=False):
-        gridNodeNums = tuple(self.Args['grid'][-1][::-1])
-        if all_comps:
-            gridNodeNums = (3,) + gridNodeNums
-        self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
-                                              dtype=self.dtype )
 
     def _gather_result_mpi(self):
         buff = np.zeros_like(self.Data['radiation'])
@@ -130,10 +123,8 @@ class SynchRad(Utilities):
         particleTrack = [x, y, z, ux, uy, uz, wp]
         return particleTrack
 
-    def _process_track(self, particleTrack, comp,
+    def _process_track(self, particleTrack, comp, nSnaps,
                        return_event=False):
-
-        compDict = {'x':0, 'y':1, 'z':2}
 
         x, y, z, ux, uy, uz, wp = particleTrack
         spect = self.Data['radiation']
@@ -154,11 +145,16 @@ class SynchRad(Utilities):
 
         args_res = [np.uint32(Nn) for Nn in self.Args['grid'][-1]]
         args_aux = [self.dtype(self.Args['timeStep']), ]
+        if 'total_series':
+            args_aux += [np.uint32(nSnaps), ]
 
         args = args_track + args_axes + args_res + args_aux
 
         if comp is 'total':
             event = self._mapper.total( self.queue, (WGS_tot, ), (WGS, ),
+                                         spect.data, *args )
+        if comp is 'total_series':
+            event = self._mapper.total_series( self.queue, (WGS_tot, ), (WGS, ),
                                          spect.data, *args )
         elif comp is 'cartesian':
             event = self._mapper.cartesian_comps( self.queue, (WGS_tot, ),
@@ -166,10 +162,6 @@ class SynchRad(Utilities):
         elif comp is 'spheric':
             event = self._mapper.spheric_comps( self.queue, (WGS_tot, ),
                                                 (WGS, ), spect.data, *args )
-        else:
-            args = [ np.uint32(compDict[comp]), ] + args
-            event = self._mapper.single_comp( self.queue, (WGS_tot, ),
-                                              (WGS, ), spect.data, *args )
 
         if return_event:
             return event
@@ -311,16 +303,31 @@ class SynchRad(Utilities):
             self.Args['radius'] = radius.astype(self.dtype)
             self.Args['dV'] = self.Args['dw']*self.Args['dr']*self.Args['dph']
 
+
+    def _init_raditaion(self, comp, nSnaps):
+
+        if comp in ('cartesian', 'spheric'):
+            all_comps=True
+        else:
+            all_comps=False
+
+        radiation_shape = tuple(self.Args['grid'][-1][::-1])
+
+        if all_comps:
+            radiation_shape = (3,) + gridNodeNums
+
+        if nSnaps > 1:
+            radiation_shape = (nSnaps, ) + radiation_shape
+
+        self.Data['radiation'] = arrcl.zeros( self.queue, radiation_shape,
+                                              dtype=self.dtype )
+
     def _init_data(self):
 
         self.Data = {}
 
         if self.plat_name is "None":
             return
-
-        gridNodeNums = tuple(self.Args['grid'][-1][::-1])
-        self.Data['radiation'] = arrcl.zeros( self.queue, gridNodeNums,
-                                                dtype=self.dtype )
 
         # Note that dw is not multiplied by 2*pi
         self.Data['omega'] = arrcl.to_device( self.queue,

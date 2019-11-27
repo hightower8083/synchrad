@@ -25,8 +25,7 @@ __kernel void spheric_comps(
   uint gti = (uint) get_global_id(0);
   uint nTotal = nTheta*nPhi*nOmega;
 
-  if (gti < nTotal)
-   {
+  if (gti < nTotal){
 
     uint iPhi = gti / (nOmega * nTheta);
     uint iTheta = (gti - iPhi*nOmega*nTheta) / nOmega;
@@ -51,7 +50,7 @@ __kernel void spheric_comps(
     ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
 
     for (uint it=0; it<nSteps-1; it++){
-
+      
       time = (${my_dtype})it * dt;
       xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
@@ -127,8 +126,7 @@ __kernel void cartesian_comps(
   uint gti = (uint) get_global_id(0);
   uint nTotal = nTheta*nPhi*nOmega;
 
-  if (gti < nTotal)
-   {
+  if (gti < nTotal){
 
     uint iPhi = gti / (nOmega * nTheta);
     uint iTheta = (gti - iPhi*nOmega*nTheta) / nOmega;
@@ -282,10 +280,8 @@ __kernel void total(
    }
 }
 
-
-__kernel void single_comp(
+__kernel void total_series(
   __global ${my_dtype} *spectrum,
-                  uint iComponent,
   __global ${my_dtype} *x,
   __global ${my_dtype} *y,
   __global ${my_dtype} *z,
@@ -302,13 +298,16 @@ __kernel void single_comp(
                   uint nOmega,
                   uint nTheta,
                   uint nPhi,
-           ${my_dtype} dt )
+           ${my_dtype} dt,
+                  uint nSnaps)
 {
   uint gti = (uint) get_global_id(0);
+  uint nTotal = nTheta*nPhi*nOmega;
+ 
+  if (gti < nTotal){
 
-  if (gti < nTheta*nPhi*nOmega)
-   {
-
+    uint dtSnap = nSteps/nSnaps;
+    
     uint iPhi = gti / (nOmega * nTheta);
     uint iTheta = (gti - iPhi*nOmega*nTheta) / nOmega;
     uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
@@ -318,24 +317,19 @@ __kernel void single_comp(
                                          sinTheta[iTheta]*sinPhi[iPhi],
                                          cosTheta[iTheta] };
 
-    ${my_dtype}3 xLocal;
-    ${my_dtype}3 uLocal;
-    ${my_dtype}3 uNextLocal;
-    ${my_dtype}3 aLocal;
-    ${my_dtype}  amplitude;
+    ${my_dtype}3 xLocal, uLocal, uNextLocal, aLocal, amplitude;
+    ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
 
-    ${my_dtype} time, phase, dPhase, sinPhase, cosPhase;
-    ${my_dtype} c1, c2, gammaInv;
+    ${my_dtype} dtInv = (${my_dtype})1. / dt;
+    ${my_dtype} wpdt2 =  wp * dt * dt;
+    ${my_dtype} phasePrev = (${my_dtype}) 0.;
+    ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
+    ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
 
-    ${my_dtype} dtInv = (${my_dtype})1./dt;
-    ${my_dtype} wpdt2 = wp*dt*dt;
-    ${my_dtype} phasePrev = (${my_dtype})0.;
-    ${my_dtype} spectrLocalRe = (${my_dtype})0.;
-    ${my_dtype} spectrLocalIm = (${my_dtype})0.;
-
+    uint iSnap = 0;
     for (uint it=0; it<nSteps-1; it++){
 
-      time = it * dt;
+      time = (${my_dtype})it * dt;
       xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
       phase = omegaLocal * (time - dot(xLocal, nVec)) ;
@@ -352,27 +346,29 @@ __kernel void single_comp(
         gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
         uNextLocal *= gammaInv;
 
-        aLocal = (uNextLocal-uLocal) * dtInv;
-        uLocal = (${my_dtype})0.5 * (uNextLocal+uLocal);
+        aLocal = (uNextLocal - uLocal) * dtInv;
+        uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
 
         c1 = dot(aLocal, nVec);
         c2 = (${my_dtype})1. - dot(uLocal, nVec);
 
-        c2 = (${my_dtype})1./c2;
+        c2 =  (${my_dtype})1. / c2;
         c1 = c1*c2*c2;
 
         sinPhase = ${f_native}sin(phase);
         cosPhase = ${f_native}cos(phase);
 
-        if(iComponent==0) amplitude = c1*(nVec.s0 - uLocal.s0) - c2*aLocal.s0;
-        if(iComponent==1) amplitude = c1*(nVec.s1 - uLocal.s1) - c2*aLocal.s1;
-        if(iComponent==2) amplitude = c1*(nVec.s2 - uLocal.s2) - c2*aLocal.s2;
-
+        amplitude = c1*(nVec - uLocal) - c2*aLocal;
         spectrLocalRe += amplitude * cosPhase;
         spectrLocalIm += amplitude * sinPhase;
       }
+      
+      if ( (it % dtSnap == 0) ){
+        spectrum[gti + nTotal*iSnap] +=  wpdt2 * ( 
+            dot(spectrLocalRe, spectrLocalRe) + 
+            dot(spectrLocalIm, spectrLocalIm) );
+        iSnap += 1;
+      }
     }
-
-    spectrum[gti] +=  wpdt2 * (spectrLocalRe*spectrLocalRe + spectrLocalIm*spectrLocalIm);
-   }
+  }
 }
