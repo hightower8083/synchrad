@@ -62,7 +62,7 @@ class SynchRad(Utilities):
             itr = 0
             for track in particleTracks:
                 track = self._track_to_device(track)
-                self._process_track(track, comp=comp)
+                self._process_track(track, comp, nSnaps)
                 itr += 1
                 if self.rank==0 and verbose:
                     progress = itr/len(particleTracks) * 100
@@ -85,7 +85,7 @@ class SynchRad(Utilities):
                     print("Done {:0.1f}%".format(progress),
                           end='\r', flush=True)
 
-        self._spectr_from_device()
+        self._spectr_from_device(nSnaps)
         if mpi_installed:
             self._gather_result_mpi()
 
@@ -97,12 +97,10 @@ class SynchRad(Utilities):
         self.comm.barrier()
         self.Data['radiation'] = buff
 
-    def _spectr_from_device(self):
-        buff = self.Data['radiation'].get()
-        if len(buff.shape)>3:
-            buff = buff.swapaxes(-1,1)
-        else:
-            buff = buff.T
+    def _spectr_from_device(self, nSnaps):
+        buff = self.Data['radiation'].get().swapaxes(-1,-3)
+        if nSnaps == 1:
+            buff = buff[-1]
         self.Data['radiation'] = np.ascontiguousarray(buff, dtype=np.double)
 
     def _track_to_device(self, particleTrack):
@@ -144,17 +142,12 @@ class SynchRad(Utilities):
             args_axes += [ self.dtype(self.Args['grid'][3]), ]
 
         args_res = [np.uint32(Nn) for Nn in self.Args['grid'][-1]]
-        args_aux = [self.dtype(self.Args['timeStep']), ]
-        if 'total_series':
-            args_aux += [np.uint32(nSnaps), ]
+        args_aux = [self.dtype(self.Args['timeStep']), np.uint32(nSnaps)]
 
         args = args_track + args_axes + args_res + args_aux
 
         if comp is 'total':
             event = self._mapper.total( self.queue, (WGS_tot, ), (WGS, ),
-                                         spect.data, *args )
-        if comp is 'total_series':
-            event = self._mapper.total_series( self.queue, (WGS_tot, ), (WGS, ),
                                          spect.data, *args )
         elif comp is 'cartesian':
             event = self._mapper.cartesian_comps( self.queue, (WGS_tot, ),
@@ -314,10 +307,9 @@ class SynchRad(Utilities):
         radiation_shape = tuple(self.Args['grid'][-1][::-1])
 
         if all_comps:
-            radiation_shape = (3,) + gridNodeNums
+            radiation_shape = (3,) + radiation_shape
 
-        if nSnaps > 1:
-            radiation_shape = (nSnaps, ) + radiation_shape
+        radiation_shape = (nSnaps, ) + radiation_shape
 
         self.Data['radiation'] = arrcl.zeros( self.queue, radiation_shape,
                                               dtype=self.dtype )
