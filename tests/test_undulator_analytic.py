@@ -47,7 +47,7 @@ for g0_p in g0 + dg * np.random.randn(Np):
     uz = (g0 ** 2 - 1 - ux ** 2) ** 0.5
     x = ux[0] / g0_p * dt / 2 + np.cumsum(ux / g0_p) * dt
 
-    particleTracks.append([x, y, z, ux, uy, uz, w])
+    particleTracks.append([x, y, z, ux, uy, uz, w, 0])
 
 # Define calculator input
 

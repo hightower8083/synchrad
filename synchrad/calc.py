@@ -32,104 +32,99 @@ class SynchRad(Utilities):
         self._init_data()
         self._compile_kernels()
 
-    def calculate_spectrum( self, particleTracks=[],
-                            h5_file=None, comp='total',
-                            Np_max=None, nSnaps=1,
-                            verbose=True ):
+    def calculate_spectrum(self, particleTracks=[],
+                           h5_file=None, comp='total', Np_max=None,
+                           nSnaps=1, it_range=None, verbose=True):
 
+        nSnaps = np.uint32(nSnaps)
         self._init_raditaion(comp, nSnaps)
 
+        if it_range is not None:
+            it_range = tuple(it_range)
+
+        # input from a file
         if h5_file is not None:
-            particleTracks=[]
 
-            if self.rank==0:
-                print('Input from the file, list input is ignored')
+            # determine if it_range is provided
+            if it_range is None:
+                if 'it_range' in h5_file['misc'].keys():
+                    it_range = tuple(h5_file['misc/it_range'][()])
+                    self._set_snap_iterations(it_range, nSnaps)
+                    if self.rank==0 and verbose:
+                        print("it_range from the input file will be used")
+                else:
+                    if self.rank==0 and verbose:
+                        print("Separate it_range for each track will be used")
+            else:
+                self._set_snap_iterations(it_range, nSnaps)
 
+            # set number of tracks to process
             Np = h5_file['misc/N_particles'][()]
-            cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w')
             if Np_max is not None:
                 Np = min(Np_max, Np)
 
-            # load all tracks to RAM (need more speed tests)
+            # load all tracks for each MPI node
+            particleTracks=[]
+            cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w', 'it_start')
             part_ind = np.arange(Np)[self.rank::self.size]
             for ip in part_ind:
-                track = [h5_file[f'tracks/{ip:d}/{cmp}'][()] for cmp in cmps]
+                track = [h5_file[f"tracks/{ip:d}/{cmp}"][()] for cmp in cmps]
                 particleTracks.append(track)
 
-            if self.rank==0:
-                print('Tracks are loaded')
+            if self.rank==0 and verbose:
+                print("Tracks are loaded")
 
-            itr = 0
-            for track in particleTracks:
-                track = self._track_to_device(track)
-                self._process_track(track, comp, nSnaps)
-                itr += 1
-                if self.rank==0 and verbose:
-                    progress = itr/len(particleTracks) * 100
-                    print("Done {:0.1f}%".format(progress),
-                          end='\r', flush=True)
+        # input from a list
         else:
+            # determine if it_range is provided
+            if it_range is not None:
+                self._set_snap_iterations(it_range, nSnaps)
+            else:
+                if self.rank==0 and verbose:
+                    print("Separate it_range for each track will be used")
+
+            # set number of tracks to process
             Np = len(particleTracks)
             if Np_max is not None:
                 Np = min(Np_max, Np)
 
+            # take set of tracks for each MPI node
             particleTracks = particleTracks[:Np][self.rank::self.size]
 
-            itr = 0
-            for track in particleTracks:
-                track = self._track_to_device(track)
-                self._process_track(track, comp, nSnaps)
-                itr += 1
-                if self.rank==0 and verbose:
-                    progress = itr/len(particleTracks) * 100
-                    print("Done {:0.1f}%".format(progress),
-                          end='\r', flush=True)
+        # process the tracks
+        itr = 0
+        for track in particleTracks:
+            track = self._track_to_device(track)
+            self._process_track(track, comp, nSnaps, it_range)
+            itr += 1
+            if self.rank==0 and verbose:
+                progress = itr/len(particleTracks) * 100
+                print("Done {:0.1f}%".format(progress),
+                      end='\r', flush=True)
 
+        # receive and gather tracks from devices
         self._spectr_from_device(nSnaps)
         if mpi_installed:
             self._gather_result_mpi()
 
-    def _gather_result_mpi(self):
-        buff = np.zeros_like(self.Data['radiation'])
-        self.comm.barrier()
-        self.comm.Reduce([self.Data['radiation'], MPI.DOUBLE],
-                         [buff, MPI.DOUBLE])
-        self.comm.barrier()
-        self.Data['radiation'] = buff
-
-    def _spectr_from_device(self, nSnaps):
-        buff = self.Data['radiation'].get().swapaxes(-1,-3)
-        if nSnaps == 1:
-            buff = buff[-1]
-        self.Data['radiation'] = np.ascontiguousarray(buff, dtype=np.double)
-
-    def _track_to_device(self, particleTrack):
-        x, y, z, ux, uy, uz, wp = particleTrack
-        x = arrcl.to_device( self.queue,
-            np.ascontiguousarray(x.astype(self.dtype)) )
-        y = arrcl.to_device( self.queue,
-            np.ascontiguousarray(y.astype(self.dtype)) )
-        z = arrcl.to_device( self.queue,
-            np.ascontiguousarray(z.astype(self.dtype)) )
-        ux = arrcl.to_device( self.queue,
-            np.ascontiguousarray(ux.astype(self.dtype)) )
-        uy = arrcl.to_device( self.queue,
-            np.ascontiguousarray(uy.astype(self.dtype)) )
-        uz = arrcl.to_device( self.queue,
-            np.ascontiguousarray(uz.astype(self.dtype)) )
-        wp = self.dtype(wp)
-        particleTrack = [x, y, z, ux, uy, uz, wp]
-        return particleTrack
 
     def _process_track(self, particleTrack, comp, nSnaps,
-                       return_event=False):
+                       it_range, return_event=False):
 
-        x, y, z, ux, uy, uz, wp = particleTrack
+        x, y, z, ux, uy, uz, wp, it_start = particleTrack
+
+        # set individual it_range, if not defined
+        if it_range is None:
+            # it_start is set to 0
+            it_start = np.uint32(0)
+            it_range = (0, x.size)
+            self._set_snap_iterations(it_range, nSnaps)
+
         spect = self.Data['radiation']
         WGS, WGS_tot = self._get_wgs(self.Args['numGridNodes'])
 
         args_track = [coord.data for coord in (x, y, z, ux, uy, uz)]
-        args_track += [ wp, np.uint32(x.size) ]
+        args_track += [wp, it_start, np.uint32(it_range[-1]), np.uint32(x.size)]
 
         if self.Args['mode'] is 'far':
             axs_str = ('omega', 'sinTheta', 'cosTheta', 'sinPhi', 'cosPhi')
@@ -142,61 +137,23 @@ class SynchRad(Utilities):
             args_axes += [ self.dtype(self.Args['grid'][3]), ]
 
         args_res = [np.uint32(Nn) for Nn in self.Args['grid'][-1]]
-        args_aux = [self.dtype(self.Args['timeStep']), np.uint32(nSnaps)]
+        args_aux = [self.Args['timeStep'], nSnaps, self.snap_iterations.data]
 
         args = args_track + args_axes + args_res + args_aux
 
         if comp is 'total':
-            event = self._mapper.total( self.queue, (WGS_tot, ), (WGS, ),
-                                         spect.data, *args )
+            mapper = self._mapper.total
         elif comp is 'cartesian':
-            event = self._mapper.cartesian_comps( self.queue, (WGS_tot, ),
-                                                  (WGS, ), spect.data, *args )
+            mapper = self._mapper.cartesian_comps
         elif comp is 'spheric':
-            event = self._mapper.spheric_comps( self.queue, (WGS_tot, ),
-                                                (WGS, ), spect.data, *args )
+            mapper = self._mapper.spheric_comps
+
+        event = mapper( self.queue, (WGS_tot, ),(WGS, ), spect.data, *args )
 
         if return_event:
             return event
         else:
             event.wait()
-
-    def _compile_kernels(self):
-
-        if self.plat_name is "None":
-            return
-
-        agrs = {}
-        agrs['my_dtype'] = self.Args['dtype']
-        if 'native' in self.Args:
-            agrs['f_native'] = 'native_'
-        else:
-            agrs['f_native'] = ''
-
-        fname = src_path
-        if self.Args['mode'] is 'far':
-            fname += "kernel_farfield.cl"
-        elif self.Args['mode'] is 'near':
-            fname += "kernel_nearfield.cl"
-
-        src = Template( filename=fname ).render(**agrs)
-        self._mapper = cl.Program(self.ctx, src).build()
-
-    def _set_global_working_group_size(self):
-        # self.WGS = self.ctx.devices[0].max_work_group_size
-
-        if self.dev_type=='CPU':
-            self.WGS = 32
-        else:
-            self.WGS = 256
-
-    def _get_wgs(self, Nelem):
-        if Nelem <= self.WGS:
-            return Nelem, Nelem
-        else:
-            WGS_tot = int(np.ceil(1.*Nelem/self.WGS))*self.WGS
-            WGS = self.WGS
-            return WGS, WGS_tot
 
     def _init_args(self, Args):
         self.Args = Args
@@ -222,6 +179,8 @@ class SynchRad(Utilities):
 
         if 'timeStep' not in self.Args.keys():
             raise KeyError("timeStep must be defined.")
+        else:
+            self.Args['timeStep'] = self.dtype(self.Args['timeStep'])
 
         if 'ctx' not in self.Args.keys():
             self.Args['ctx'] = None
@@ -296,7 +255,6 @@ class SynchRad(Utilities):
             self.Args['radius'] = radius.astype(self.dtype)
             self.Args['dV'] = self.Args['dw']*self.Args['dr']*self.Args['dph']
 
-
     def _init_raditaion(self, comp, nSnaps):
 
         if comp in ('cartesian', 'spheric'):
@@ -311,8 +269,9 @@ class SynchRad(Utilities):
 
         radiation_shape = (nSnaps, ) + radiation_shape
 
-        self.Data['radiation'] = arrcl.zeros( self.queue, radiation_shape,
-                                              dtype=self.dtype )
+        self.Data['radiation'] = arrcl.zeros(self.queue, radiation_shape,
+                                             dtype=self.dtype)
+        cl.enqueue_barrier(self.queue)
 
     def _init_data(self):
 
@@ -387,3 +346,85 @@ class SynchRad(Utilities):
                    format(self.plat_name, self.ocl_version) )
 
         self._set_global_working_group_size()
+
+    def _gather_result_mpi(self):
+
+        buff = np.zeros_like(self.Data['radiation'])
+        self.comm.barrier()
+        self.comm.Reduce([self.Data['radiation'], MPI.DOUBLE],
+                         [buff, MPI.DOUBLE])
+        self.comm.barrier()
+        self.Data['radiation'] = buff
+
+    def _spectr_from_device(self, nSnaps):
+
+        buff = self.Data['radiation'].get().swapaxes(-1,-3)
+        if nSnaps == 1:
+            buff = buff[-1]
+        self.Data['radiation'] = np.ascontiguousarray(buff, dtype=np.double)
+
+    def _track_to_device(self, particleTrack):
+        x, y, z, ux, uy, uz, wp, it_start = particleTrack
+
+        x = arrcl.to_device( self.queue,
+            np.ascontiguousarray(x.astype(self.dtype)) )
+        y = arrcl.to_device( self.queue,
+            np.ascontiguousarray(y.astype(self.dtype)) )
+        z = arrcl.to_device( self.queue,
+            np.ascontiguousarray(z.astype(self.dtype)) )
+        ux = arrcl.to_device( self.queue,
+            np.ascontiguousarray(ux.astype(self.dtype)) )
+        uy = arrcl.to_device( self.queue,
+            np.ascontiguousarray(uy.astype(self.dtype)) )
+        uz = arrcl.to_device( self.queue,
+            np.ascontiguousarray(uz.astype(self.dtype)) )
+        wp = self.dtype(wp)
+        it_start = np.uint32(it_start)
+
+        particleTrack = [x, y, z, ux, uy, uz, wp, it_start]
+
+        return particleTrack
+
+    def _compile_kernels(self):
+
+        if self.plat_name is "None":
+            return
+
+        agrs = {}
+        agrs['my_dtype'] = self.Args['dtype']
+        if 'native' in self.Args:
+            agrs['f_native'] = 'native_'
+        else:
+            agrs['f_native'] = ''
+
+        fname = src_path
+        if self.Args['mode'] is 'far':
+            fname += "kernel_farfield.cl"
+        elif self.Args['mode'] is 'near':
+            fname += "kernel_nearfield.cl"
+
+        src = Template( filename=fname ).render(**agrs)
+        self._mapper = cl.Program(self.ctx, src).build()
+
+    def _set_snap_iterations(self, it_range, nSnaps):
+        self.snap_iterations = np.ascontiguousarray(
+          np.linspace( *(it_range+(nSnaps+1, )), dtype=np.uint32)[1:])
+
+        self.snap_iterations = arrcl.to_device(self.queue, self.snap_iterations)
+
+
+    def _set_global_working_group_size(self):
+        # self.WGS = self.ctx.devices[0].max_work_group_size
+
+        if self.dev_type=='CPU':
+            self.WGS = 32
+        else:
+            self.WGS = 256
+
+    def _get_wgs(self, Nelem):
+        if Nelem <= self.WGS:
+            return Nelem, Nelem
+        else:
+            WGS_tot = int(np.ceil(1.*Nelem/self.WGS))*self.WGS
+            WGS = self.WGS
+            return WGS, WGS_tot
