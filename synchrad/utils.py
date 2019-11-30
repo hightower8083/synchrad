@@ -77,7 +77,8 @@ def record_particles_first_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
 class Utilities:
 
     def get_full_spectrum(self, spect_filter=None, \
-      phot_num=False, lambda0_um=None, comp='total', iteration=-1):
+                          phot_num=False, lambda0_um=None,
+                          comp='total', iteration=-1):
 
         keys = self.Data['radiation'].keys()
 
@@ -111,10 +112,10 @@ class Utilities:
         return val
 
     def get_energy_spectrum(self, spect_filter=None, \
-      phot_num=False, lambda0_um=None):
+      phot_num=False, lambda0_um=None, **kw_args):
 
         val = self.get_full_spectrum(spect_filter=spect_filter, \
-          phot_num=phot_num, lambda0_um=lambda0_um)
+          phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
         if self.Args['mode'] == 'far':
             val = 0.5*self.Args['dth']*self.Args['dph']*( (val[1:] + val[:-1]) \
@@ -129,19 +130,19 @@ class Utilities:
         return val
 
     def get_energy(self, spect_filter=None, \
-      phot_num=False, lambda0_um=None):
+      phot_num=False, lambda0_um=None, **kw_args):
 
         val = self.get_energy_spectrum(spect_filter=spect_filter, \
-          phot_num=phot_num, lambda0_um=lambda0_um)
+          phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
         val = (val*self.Args['dw']).sum()
         return val
 
     def get_spot(self, k0=None, spect_filter=None, \
-      phot_num=False, lambda0_um = None):
+      phot_num=False, lambda0_um = None, **kw_args):
 
         val = self.get_full_spectrum(spect_filter=spect_filter, \
-          phot_num=phot_num, lambda0_um=lambda0_um)
+          phot_num=phot_num, lambda0_um=lambda0_um,  **kw_args)
 
         if k0 is None:
             if val.shape[0]>1:
@@ -157,10 +158,10 @@ class Utilities:
         return val
 
     def get_spot_cartesian(self, k0=None, th_part=1.0, bins=(200, 200), \
-      spect_filter=None, phot_num=False, lambda0_um = None):
+      spect_filter=None, phot_num=False, lambda0_um = None, **kw_args):
 
         val = self.get_spot(spect_filter=spect_filter, \
-          k0=k0, phot_num=phot_num, lambda0_um=lambda0_um)
+          k0=k0, phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
         if self.Args['mode'] == 'far':
             th, ph = self.Args['theta'], self.Args['phi']
@@ -193,7 +194,7 @@ class Utilities:
 
     def exportToVTK( self, spect_filter=None, phot_num=False,\
                      lambda0_um = None, smooth_filter=None, \
-                     filename='spectrum', project=False):
+                     filename='spectrum', project=False, **kw_args):
 
         if not tvtk_installed:
             print('TVTK API is not found')
@@ -205,11 +206,11 @@ class Utilities:
 
         if project is False:
             val = self.get_full_spectrum(spect_filter=spect_filter, \
-                        phot_num=phot_num, lambda0_um=lambda0_um)
+                        phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
             scalar_name = 'spectrum'
         else:
             val = self.get_spot( phot_num=phot_num, lambda0_um=lambda0_um, \
-                                 spect_filter=spect_filter)
+                                 spect_filter=spect_filter, **kw_args)
             val = val[None, :, :]
             omega = omega[[-1]]
             filename += '_proj'
