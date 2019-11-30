@@ -3,7 +3,9 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 __kernel void spheric_comps(
-  __global ${my_dtype} *spectrum,
+  __global ${my_dtype} *spectrum1,
+  __global ${my_dtype} *spectrum2,
+  __global ${my_dtype} *spectrum3,
   __global ${my_dtype} *x,
   __global ${my_dtype} *y,
   __global ${my_dtype} *z,
@@ -108,15 +110,15 @@ __kernel void spheric_comps(
 
       if (it_glob+2 == itSnaps[iSnap])
       {
-        spectrum[gti + 3*nTotal*iSnap] +=  wpdt2 *
+        spectrum1[gti + nTotal*iSnap] +=  wpdt2 *
           (spectrLocalRe.s0*spectrLocalRe.s0 +
            spectrLocalIm.s0*spectrLocalIm.s0);
 
-        spectrum[gti+nTotal + 3*nTotal*iSnap] +=  wpdt2 *
+        spectrum2[gti + nTotal*iSnap] +=  wpdt2 *
           (spectrLocalRe.s1*spectrLocalRe.s1 +
            spectrLocalIm.s1*spectrLocalIm.s1);
 
-        spectrum[gti+2*nTotal+ 3*nTotal*iSnap] +=  wpdt2 *
+        spectrum3[gti + nTotal*iSnap] +=  wpdt2 *
           (spectrLocalRe.s2*spectrLocalRe.s2 +
            spectrLocalIm.s2*spectrLocalIm.s2);
         iSnap += 1;
@@ -126,7 +128,9 @@ __kernel void spheric_comps(
 }
 
 __kernel void cartesian_comps(
-  __global ${my_dtype} *spectrum,
+  __global ${my_dtype} *spectrum1,
+  __global ${my_dtype} *spectrum2,
+  __global ${my_dtype} *spectrum3,
   __global ${my_dtype} *x,
   __global ${my_dtype} *y,
   __global ${my_dtype} *z,
@@ -222,15 +226,15 @@ __kernel void cartesian_comps(
 
       if (it_glob+2 == itSnaps[iSnap])
       {
-        spectrum[gti + 3*nTotal*iSnap] +=  wpdt2 *
+        spectrum1[gti + nTotal*iSnap] +=  wpdt2 *
           (spectrLocalRe.s0*spectrLocalRe.s0 +
            spectrLocalIm.s0*spectrLocalIm.s0);
 
-        spectrum[gti+nTotal + 3*nTotal*iSnap] +=  wpdt2 *
+        spectrum2[gti + nTotal*iSnap] +=  wpdt2 *
           (spectrLocalRe.s1*spectrLocalRe.s1 +
            spectrLocalIm.s1*spectrLocalIm.s1);
 
-        spectrum[gti+2*nTotal+ 3*nTotal*iSnap] +=  wpdt2 *
+        spectrum3[gti + nTotal*iSnap] +=  wpdt2 *
           (spectrLocalRe.s2*spectrLocalRe.s2 +
            spectrLocalIm.s2*spectrLocalIm.s2);
         iSnap += 1;

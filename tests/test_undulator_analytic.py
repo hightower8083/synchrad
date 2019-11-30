@@ -59,7 +59,7 @@ calc_input = {
         (128, 32, 32),
     ],  # Corresponding resolutions
     "timeStep": dt,  # normalized timestep
-    #             'ctx':'mpi',                        # OpenCL context (leave commented to be asked)
+    # 'ctx':'mpi',                        # OpenCL context (leave commented to be asked)
 }
 
 print("Running default mode with double precision")
@@ -68,6 +68,7 @@ calc = SynchRad(calc_input)
 
 t0 = time.time()
 calc.calculate_spectrum(particleTracks.copy(), comp="total", Np_max=Np)
+
 if calc.rank == 0:
     print(
         "Done {:s}field spectrum from {:d} particle(s) in {:g} sec".format(
@@ -99,15 +100,16 @@ calc._init_args(calc.Args)
 calc._init_data()
 calc._compile_kernels()
 
-# calc = SynchRad(calc_input)
 t0 = time.time()
 calc.calculate_spectrum(particleTracks.copy(), comp="total", Np_max=Np)
+
 if calc.rank == 0:
     print(
         "Done {:s}field spectrum from {:d} particle(s) in {:g} sec".format(
             calc.Args["mode"], Np, (time.time() - t0)
         )
     )
+
     energyModel = calc.get_energy(lambda0_um=1)
     energyTheory = (
         Np

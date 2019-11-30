@@ -77,12 +77,23 @@ def record_particles_first_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
 class Utilities:
 
     def get_full_spectrum(self, spect_filter=None, \
-      phot_num=False, lambda0_um=None):
+      phot_num=False, lambda0_um=None, comp='total', iteration=-1):
+
+        keys = self.Data['radiation'].keys()
+
+        val = 0.0
+        if comp=='total':
+            for key in keys:
+                val += self.Data['radiation'][key][iteration].astype(np.double)
+        else:
+            val += self.Data['radiation'][ comp][iteration].astype(np.double)
+
+        print(val.shape)
 
         if self.Args['mode'] == 'far':
-            val = alpha_fs/(4*np.pi**2)*self.Data['radiation'].astype(np.double)
-        elif self.Args['mode'] == 'near2D' or self.Args['mode'] == 'near':
-            val = alpha_fs*np.pi/4*self.Data['radiation'].astype(np.double)
+            val = alpha_fs / (4 * np.pi**2) * val
+        elif self.Args['mode'] == 'near':
+            val = alpha_fs * np.pi / 4 * val
             val /= (2*np.pi)**2
 
         if spect_filter is not None:

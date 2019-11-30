@@ -108,8 +108,7 @@ class SynchRad(Utilities):
             self._gather_result_mpi()
 
 
-    def _process_track(self, particleTrack, comp, nSnaps,
-                       it_range, return_event=False):
+    def _process_track(self, particleTrack, comp, nSnaps, it_range):
 
         x, y, z, ux, uy, uz, wp, it_start = particleTrack
 
@@ -142,18 +141,16 @@ class SynchRad(Utilities):
         args = args_track + args_axes + args_res + args_aux
 
         if comp is 'total':
-            mapper = self._mapper.total
+            self._mapper.total(self.queue, (WGS_tot, ), (WGS, ),
+                               spect['total'].data, *args)
+
         elif comp is 'cartesian':
-            mapper = self._mapper.cartesian_comps
+            self._mapper.cartesian_comps(self.queue, (WGS_tot, ), (WGS, ),
+                spect['x'].data, spect['y'].data, spect['z'].data, *args)
+
         elif comp is 'spheric':
-            mapper = self._mapper.spheric_comps
-
-        event = mapper( self.queue, (WGS_tot, ),(WGS, ), spect.data, *args )
-
-        if return_event:
-            return event
-        else:
-            event.wait()
+            self._mapper.spheric_comps(self.queue, (WGS_tot, ), (WGS, ),
+                spect['r'].data, spect['theta'].data, spect['phi'].data, *args)
 
     def _init_args(self, Args):
         self.Args = Args
@@ -257,21 +254,19 @@ class SynchRad(Utilities):
 
     def _init_raditaion(self, comp, nSnaps):
 
-        if comp in ('cartesian', 'spheric'):
-            all_comps=True
-        else:
-            all_comps=False
-
         radiation_shape = tuple(self.Args['grid'][-1][::-1])
-
-        if all_comps:
-            radiation_shape = (3,) + radiation_shape
-
         radiation_shape = (nSnaps, ) + radiation_shape
 
-        self.Data['radiation'] = arrcl.zeros(self.queue, radiation_shape,
-                                             dtype=self.dtype)
-        cl.enqueue_barrier(self.queue)
+        vec_comps = {'cartesian':['x', 'y', 'z'],
+                     'spheric':['r', 'theta', 'phi'],
+                     'total': ['total',]
+                     }
+
+        self.Data['radiation'] = {}
+
+        for vec_comp in vec_comps[comp]:
+            self.Data['radiation'][vec_comp] = \
+                arrcl.zeros(self.queue, radiation_shape, dtype=self.dtype)
 
     def _init_data(self):
 
@@ -349,19 +344,20 @@ class SynchRad(Utilities):
 
     def _gather_result_mpi(self):
 
-        buff = np.zeros_like(self.Data['radiation'])
-        self.comm.barrier()
-        self.comm.Reduce([self.Data['radiation'], MPI.DOUBLE],
-                         [buff, MPI.DOUBLE])
-        self.comm.barrier()
-        self.Data['radiation'] = buff
+        for key in self.Data['radiation'].keys():
+            buff = np.zeros_like(self.Data['radiation'][key])
+            self.comm.barrier()
+            self.comm.Reduce([self.Data['radiation'][key], MPI.DOUBLE],
+                             [buff, MPI.DOUBLE])
+            self.comm.barrier()
+            self.Data['radiation'][key] = buff
 
     def _spectr_from_device(self, nSnaps):
-
-        buff = self.Data['radiation'].get().swapaxes(-1,-3)
-        if nSnaps == 1:
-            buff = buff[-1]
-        self.Data['radiation'] = np.ascontiguousarray(buff, dtype=np.double)
+        for key in self.Data['radiation'].keys():
+            buff = self.Data['radiation'][key].get().swapaxes(-1,-3)
+            #if nSnaps == 1:
+            #    buff = buff[-1]
+            self.Data['radiation'][key] = np.ascontiguousarray(buff, dtype=np.double)
 
     def _track_to_device(self, particleTrack):
         x, y, z, ux, uy, uz, wp, it_start = particleTrack
