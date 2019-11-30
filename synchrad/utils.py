@@ -88,8 +88,6 @@ class Utilities:
         else:
             val += self.Data['radiation'][ comp][iteration].astype(np.double)
 
-        print(val.shape)
-
         if self.Args['mode'] == 'far':
             val = alpha_fs / (4 * np.pi**2) * val
         elif self.Args['mode'] == 'near':
