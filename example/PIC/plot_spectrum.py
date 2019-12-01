@@ -60,7 +60,9 @@ if __name__ == "__main__":
     calc = SynchRad(calc_input)
 
     with h5py.File("spectrum.h5", "r") as f:
-        calc.Data["radiation"] = f["radiation"][...] / total_particle_weight
+        calc.Data["radiation"] = {}
+        for key in f["radiation"].keys():
+            calc.Data["radiation"][key] = f[f"radiation/{key}"][...] / total_particle_weight
 
     # compute total emitted energy
     E_cutoff = 1.0  # keV

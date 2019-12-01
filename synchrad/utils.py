@@ -15,64 +15,47 @@ except (ImportError,):
 J_in_um = 2e6*np.pi*hbar*c
 
 @njit
-def record_particles_step(tracks, nsteps, x, y, z, ux, uy, uz, id,
+def record_particles_step(tracks, nsteps, it, it_start,
+                          x, y, z, ux, uy, uz, id,
                           Np_select, dNp):
     for ip in range(Np_select):
         ip_glob = ip*dNp
-        if np.isnan(x[ip_glob]): continue
+
+        if np.isnan(x[ip_glob]):
+            continue
+
+        if it_start[ip]==0:
+            it_start[ip] = it
+
         point = [ x[ip_glob], y[ip_glob], z[ip_glob],
                   ux[ip_glob], uy[ip_glob], uz[ip_glob],
                   id[ip_glob] ]
 
         tracks[nsteps[ip], ip, :] = point
         nsteps[ip] += 1
-    return tracks, nsteps
+
+    return tracks, nsteps, it_start
 
 @njit
-def record_particles_step_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
-                          Np_select, dNp, maxR2):
-    for ip in range(Np_select):
-        ip_glob = ip*dNp
-        x_loc = x[ip_glob]
-        y_loc = y[ip_glob]
-        if np.isnan(x_loc): continue
-        if (x_loc*x_loc+y_loc*y_loc>maxR2) : continue
-
-        point = [ x_loc, y_loc, z[ip_glob],
-                  ux[ip_glob], uy[ip_glob], uz[ip_glob],
-                  id[ip_glob] ]
-
-        tracks[nsteps[ip], ip, :] = point
-        nsteps[ip] += 1
-    return tracks, nsteps
-
-@njit
-def record_particles_first(tracks, nsteps, x, y, z, ux, uy, uz, id,
+def record_particles_first(tracks, nsteps, it, it_start,
+                           x, y, z, ux, uy, uz, id,
                            Np_select):
     for ip in range(Np_select):
-        if np.isnan(x[ip]): continue
+
+        if np.isnan(x[ip]):
+            continue
+
+        if it_start[ip]==0:
+            it_start[ip] = it
+
         point = [ x[ip], y[ip], z[ip],
                   ux[ip], uy[ip], uz[ip], id[ip] ]
 
         tracks[nsteps[ip], ip, :] = point
         nsteps[ip] += 1
-    return tracks, nsteps
 
+    return tracks, nsteps, it_start
 
-@njit
-def record_particles_first_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
-                                Np_select, maxR2):
-    for ip in range(Np_select):
-        x_loc = x[ip]
-        y_loc = y[ip]
-        if np.isnan(x_loc): continue
-        if (x_loc*x_loc+y_loc*y_loc>maxR2) : continue
-        point = [ x_loc, y_loc, z[ip],
-                  ux[ip], uy[ip], uz[ip], id[ip] ]
-
-        tracks[nsteps[ip], ip, :] = point
-        nsteps[ip] += 1
-    return tracks, nsteps
 
 class Utilities:
 
@@ -279,27 +262,22 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
 
     tracks = np.zeros( (Nt, Np_select, 7), dtype=np.double )
     nsteps = np.zeros( Np_select, dtype=np.int )
+    it_start = np.zeros( Np_select, dtype=np.int )
 
     for it, iteration in enumerate(iterations):
         x, y, z, ux, uy, uz, id = ts.get_particle(
             var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'id'],
             select=pt, iteration=iteration )
 
-        if x.size < Np: continue
+        if x.size < Np:
+            continue
+
         if Np_select is not None:
-            if maxRaduis is None:
-                tracks, nsteps = record_particles_first(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select)
-            else:
-                tracks, nsteps = record_particles_first_limR2(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select, maxRaduis**2)
+            tracks, nsteps, it_start = record_particles_first(tracks, nsteps,
+                it, it_start, x, y, z, ux, uy, uz, id, Np_select)
         elif dNp is not None:
-            if maxRaduis is None:
-                tracks, nsteps = record_particles_step(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select, dNp)
-            else:
-                tracks, nsteps = record_particles_step_limR2(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select, dNp, maxRaduis**2)
+            tracks, nsteps, it_start = record_particles_step(tracks, nsteps,
+                it, it_start, x, y, z, ux, uy, uz, id, Np_select, dNp)
 
         if verbose:
             print( f"Done {it/len(iterations)*100: 0.1f}%",
@@ -309,6 +287,7 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
     if fname is not None:
         f = h5py.File(fname, mode='w')
         i_tr = 0
+        it_end_glob = 0
         for ip in range(tracks.shape[1]):
             x, y, z, ux, uy, uz, id = tracks[:,ip,:].T
             if nsteps[ip]>8 :
@@ -320,10 +299,17 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
                 f[f'tracks/{i_tr:d}/uz'] = uz[:nsteps[ip]]
                 f[f'tracks/{i_tr:d}/id'] = id[:nsteps[ip]]
                 f[f'tracks/{i_tr:d}/w'] = w_select[ip]
+                f[f'tracks/{i_tr:d}/it_start'] = it_start[ip]
+
+                if  it_start[ip] + nsteps[ip] > it_end_glob:
+                    it_end_glob = it_start[ip] + nsteps[ip]
+
                 i_tr += 1
 
         f['misc/cdt'] = dt
         f['misc/N_particles'] = i_tr
+        f['misc/it_start'] = it_start.min()
+        f['misc/it_end'] = it_end_glob
         f['misc/propagation_direction'] = 'z'
         f.close()
         return
@@ -335,6 +321,6 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
             particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]],
                                     z[:nsteps[ip]], ux[:nsteps[ip]],
                                     uy[:nsteps[ip]], uz[:nsteps[ip]],
-                                    w_select[ip], ] )
+                                    w_select[ip], ], it_start[ip])
 
         return particleTracks, dt
