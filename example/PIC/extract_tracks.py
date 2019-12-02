@@ -5,7 +5,7 @@ from synchrad.utils import tracksFromOPMD
 
 
 if __name__ == "__main__":
-    ts = LpaDiagnostics("diags_track/hdf5", check_all_files=True)
+    ts = LpaDiagnostics("diags_track/hdf5", check_all_files=False)
     ref_iteration = ts.iterations[-1]
 
     pt = ParticleTracker(ts, iteration=ref_iteration, preserve_particle_index=True)

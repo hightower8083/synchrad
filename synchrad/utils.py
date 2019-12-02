@@ -224,13 +224,13 @@ class Utilities:
         spc_vtk.point_data.scalars.name = scalar_name
         write_data(spc_vtk, filename)
 
-def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
+def tracksFromOPMD(ts, pt, ref_iteration, fname=None, species=None,
                    dNp=None, Np_select=None, maxRaduis=None,
                    Nit_min=None, Nit_max=None, verbose=True):
 
     Np = pt.N_selected
     w_select, = ts.get_particle(var_list=['w',], select=pt,
-                                iteration=ref_iteration )
+                                species=species, iteration=ref_iteration)
 
     if (Np_select is None) and (dNp is None):
         print('Either Np_select or dNp can be used. Choosing all particles.')
@@ -267,7 +267,7 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
     for it, iteration in enumerate(iterations):
         x, y, z, ux, uy, uz, id = ts.get_particle(
             var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'id'],
-            select=pt, iteration=iteration )
+            select=pt, iteration=iteration, species=species)
 
         if x.size < Np:
             continue

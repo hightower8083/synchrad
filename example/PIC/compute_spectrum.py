@@ -12,7 +12,10 @@ if __name__ == "__main__":
     it_range = (it_start_glob, it_end_glob)
 
     calc_input = {
-        "grid": [(10, 1.2e4), (0, 0.03), (0.0, 2 * np.pi), (256, 36, 36)],
+        "grid": [ (10, 1.2e4),
+                  (0, 0.03),
+                  (0.0, 2 * np.pi),
+                  (256, 36, 36)],
         "timeStep": time_step,
         "dtype": "double",
         "native": False,
