@@ -1,7 +1,7 @@
 import h5py
 import numpy as np
 from matplotlib import pyplot
-from opmd_viewer.addons.pic import LpaDiagnostics
+from openpmd_viewer.addons.pic import LpaDiagnostics
 from sliceplots import plot_multicolored_line, addcolorbar, Plot2D
 
 from synchrad.calc import SynchRad
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
             _, line = plot_multicolored_line(
                 ax=ax,
-                x=z,
+                x=z*1e6,
                 y=ux,
                 other_y=uz,
                 vmin=10,

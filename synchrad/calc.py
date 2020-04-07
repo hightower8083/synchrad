@@ -360,7 +360,11 @@ class SynchRad(Utilities):
             self.Data['radiation'][key] = np.ascontiguousarray(buff, dtype=np.double)
 
     def _track_to_device(self, particleTrack):
-        x, y, z, ux, uy, uz, wp, it_start = particleTrack
+        if len(particleTrack) == 8:
+            x, y, z, ux, uy, uz, wp, it_start = particleTrack
+        elif len(particleTrack) == 7:
+            x, y, z, ux, uy, uz, wp = particleTrack
+            it_start = 0
 
         x = arrcl.to_device( self.queue,
             np.ascontiguousarray(x.astype(self.dtype)) )

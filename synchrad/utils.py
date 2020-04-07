@@ -258,7 +258,7 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, species=None,
     iterations = iterations[iter_ind_select]
     Nt = iterations.size
 
-    dt = (ts.t[1] - ts.t[0]) * c * 1e6 # in microns as coordinates
+    dt = (ts.t[1] - ts.t[0]) * c
 
     tracks = np.zeros( (Nt, Np_select, 7), dtype=np.double )
     nsteps = np.zeros( Np_select, dtype=np.int )
