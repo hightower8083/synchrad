@@ -15,74 +15,67 @@ except (ImportError,):
 J_in_um = 2e6*np.pi*hbar*c
 
 @njit
-def record_particles_step(tracks, nsteps, x, y, z, ux, uy, uz, id,
+def record_particles_step(tracks, nsteps, it, it_start,
+                          x, y, z, ux, uy, uz, id,
                           Np_select, dNp):
     for ip in range(Np_select):
         ip_glob = ip*dNp
-        if np.isnan(x[ip_glob]): continue
+
+        if np.isnan(x[ip_glob]):
+            continue
+
+        if it_start[ip]==0:
+            it_start[ip] = it
+
         point = [ x[ip_glob], y[ip_glob], z[ip_glob],
                   ux[ip_glob], uy[ip_glob], uz[ip_glob],
                   id[ip_glob] ]
 
         tracks[nsteps[ip], ip, :] = point
         nsteps[ip] += 1
-    return tracks, nsteps
+
+    return tracks, nsteps, it_start
 
 @njit
-def record_particles_step_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
-                          Np_select, dNp, maxR2):
-    for ip in range(Np_select):
-        ip_glob = ip*dNp
-        x_loc = x[ip_glob]
-        y_loc = y[ip_glob]
-        if np.isnan(x_loc): continue
-        if (x_loc*x_loc+y_loc*y_loc>maxR2) : continue
-
-        point = [ x_loc, y_loc, z[ip_glob],
-                  ux[ip_glob], uy[ip_glob], uz[ip_glob],
-                  id[ip_glob] ]
-
-        tracks[nsteps[ip], ip, :] = point
-        nsteps[ip] += 1
-    return tracks, nsteps
-
-@njit
-def record_particles_first(tracks, nsteps, x, y, z, ux, uy, uz, id,
+def record_particles_first(tracks, nsteps, it, it_start,
+                           x, y, z, ux, uy, uz, id,
                            Np_select):
     for ip in range(Np_select):
-        if np.isnan(x[ip]): continue
+
+        if np.isnan(x[ip]):
+            continue
+
+        if it_start[ip]==0:
+            it_start[ip] = it
+
         point = [ x[ip], y[ip], z[ip],
                   ux[ip], uy[ip], uz[ip], id[ip] ]
 
         tracks[nsteps[ip], ip, :] = point
         nsteps[ip] += 1
-    return tracks, nsteps
 
+    return tracks, nsteps, it_start
 
-@njit
-def record_particles_first_limR2(tracks, nsteps, x, y, z, ux, uy, uz, id,
-                                Np_select, maxR2):
-    for ip in range(Np_select):
-        x_loc = x[ip]
-        y_loc = y[ip]
-        if np.isnan(x_loc): continue
-        if (x_loc*x_loc+y_loc*y_loc>maxR2) : continue
-        point = [ x_loc, y_loc, z[ip],
-                  ux[ip], uy[ip], uz[ip], id[ip] ]
-
-        tracks[nsteps[ip], ip, :] = point
-        nsteps[ip] += 1
-    return tracks, nsteps
 
 class Utilities:
 
     def get_full_spectrum(self, spect_filter=None, \
-      phot_num=False, lambda0_um=None):
+                          phot_num=False, lambda0_um=None,
+                          comp='total', iteration=-1):
+
+        keys = self.Data['radiation'].keys()
+
+        val = 0.0
+        if comp=='total':
+            for key in keys:
+                val += self.Data['radiation'][key][iteration].astype(np.double)
+        else:
+            val += self.Data['radiation'][ comp][iteration].astype(np.double)
 
         if self.Args['mode'] == 'far':
-            val = alpha_fs/(4*np.pi**2)*self.Data['radiation'].astype(np.double)
-        elif self.Args['mode'] == 'near2D' or self.Args['mode'] == 'near':
-            val = alpha_fs*np.pi/4*self.Data['radiation'].astype(np.double)
+            val = alpha_fs / (4 * np.pi**2) * val
+        elif self.Args['mode'] == 'near':
+            val = alpha_fs * np.pi / 4 * val
             val /= (2*np.pi)**2
 
         if spect_filter is not None:
@@ -102,10 +95,10 @@ class Utilities:
         return val
 
     def get_energy_spectrum(self, spect_filter=None, \
-      phot_num=False, lambda0_um=None):
+      phot_num=False, lambda0_um=None, **kw_args):
 
         val = self.get_full_spectrum(spect_filter=spect_filter, \
-          phot_num=phot_num, lambda0_um=lambda0_um)
+          phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
         if self.Args['mode'] == 'far':
             val = 0.5*self.Args['dth']*self.Args['dph']*( (val[1:] + val[:-1]) \
@@ -120,19 +113,19 @@ class Utilities:
         return val
 
     def get_energy(self, spect_filter=None, \
-      phot_num=False, lambda0_um=None):
+      phot_num=False, lambda0_um=None, **kw_args):
 
         val = self.get_energy_spectrum(spect_filter=spect_filter, \
-          phot_num=phot_num, lambda0_um=lambda0_um)
+          phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
         val = (val*self.Args['dw']).sum()
         return val
 
     def get_spot(self, k0=None, spect_filter=None, \
-      phot_num=False, lambda0_um = None):
+      phot_num=False, lambda0_um = None, **kw_args):
 
         val = self.get_full_spectrum(spect_filter=spect_filter, \
-          phot_num=phot_num, lambda0_um=lambda0_um)
+          phot_num=phot_num, lambda0_um=lambda0_um,  **kw_args)
 
         if k0 is None:
             if val.shape[0]>1:
@@ -148,10 +141,10 @@ class Utilities:
         return val
 
     def get_spot_cartesian(self, k0=None, th_part=1.0, bins=(200, 200), \
-      spect_filter=None, phot_num=False, lambda0_um = None):
+      spect_filter=None, phot_num=False, lambda0_um = None, **kw_args):
 
         val = self.get_spot(spect_filter=spect_filter, \
-          k0=k0, phot_num=phot_num, lambda0_um=lambda0_um)
+          k0=k0, phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
         if self.Args['mode'] == 'far':
             th, ph = self.Args['theta'], self.Args['phi']
@@ -184,7 +177,7 @@ class Utilities:
 
     def exportToVTK( self, spect_filter=None, phot_num=False,\
                      lambda0_um = None, smooth_filter=None, \
-                     filename='spectrum', project=False):
+                     filename='spectrum', project=False, **kw_args):
 
         if not tvtk_installed:
             print('TVTK API is not found')
@@ -196,11 +189,11 @@ class Utilities:
 
         if project is False:
             val = self.get_full_spectrum(spect_filter=spect_filter, \
-                        phot_num=phot_num, lambda0_um=lambda0_um)
+                        phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
             scalar_name = 'spectrum'
         else:
             val = self.get_spot( phot_num=phot_num, lambda0_um=lambda0_um, \
-                                 spect_filter=spect_filter)
+                                 spect_filter=spect_filter, **kw_args)
             val = val[None, :, :]
             omega = omega[[-1]]
             filename += '_proj'
@@ -231,13 +224,13 @@ class Utilities:
         spc_vtk.point_data.scalars.name = scalar_name
         write_data(spc_vtk, filename)
 
-def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
+def tracksFromOPMD(ts, pt, ref_iteration, fname=None, species=None,
                    dNp=None, Np_select=None, maxRaduis=None,
                    Nit_min=None, Nit_max=None, verbose=True):
 
     Np = pt.N_selected
     w_select, = ts.get_particle(var_list=['w',], select=pt,
-                                iteration=ref_iteration )
+                                species=species, iteration=ref_iteration)
 
     if (Np_select is None) and (dNp is None):
         print('Either Np_select or dNp can be used. Choosing all particles.')
@@ -265,31 +258,26 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
     iterations = iterations[iter_ind_select]
     Nt = iterations.size
 
-    dt = (ts.t[1] - ts.t[0]) * c * 1e6 # in microns as coordinates
+    dt = (ts.t[1] - ts.t[0]) * c
 
     tracks = np.zeros( (Nt, Np_select, 7), dtype=np.double )
     nsteps = np.zeros( Np_select, dtype=np.int )
+    it_start = np.zeros( Np_select, dtype=np.int )
 
     for it, iteration in enumerate(iterations):
         x, y, z, ux, uy, uz, id = ts.get_particle(
             var_list=['x', 'y', 'z', 'ux', 'uy', 'uz', 'id'],
-            select=pt, iteration=iteration )
+            select=pt, iteration=iteration, species=species)
 
-        if x.size < Np: continue
+        if x.size < Np:
+            continue
+
         if Np_select is not None:
-            if maxRaduis is None:
-                tracks, nsteps = record_particles_first(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select)
-            else:
-                tracks, nsteps = record_particles_first_limR2(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select, maxRaduis**2)
+            tracks, nsteps, it_start = record_particles_first(tracks, nsteps,
+                it, it_start, x, y, z, ux, uy, uz, id, Np_select)
         elif dNp is not None:
-            if maxRaduis is None:
-                tracks, nsteps = record_particles_step(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select, dNp)
-            else:
-                tracks, nsteps = record_particles_step_limR2(tracks, nsteps,
-                    x, y, z, ux, uy, uz, id, Np_select, dNp, maxRaduis**2)
+            tracks, nsteps, it_start = record_particles_step(tracks, nsteps,
+                it, it_start, x, y, z, ux, uy, uz, id, Np_select, dNp)
 
         if verbose:
             print( f"Done {it/len(iterations)*100: 0.1f}%",
@@ -299,6 +287,7 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
     if fname is not None:
         f = h5py.File(fname, mode='w')
         i_tr = 0
+        it_end_glob = 0
         for ip in range(tracks.shape[1]):
             x, y, z, ux, uy, uz, id = tracks[:,ip,:].T
             if nsteps[ip]>8 :
@@ -310,10 +299,17 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
                 f[f'tracks/{i_tr:d}/uz'] = uz[:nsteps[ip]]
                 f[f'tracks/{i_tr:d}/id'] = id[:nsteps[ip]]
                 f[f'tracks/{i_tr:d}/w'] = w_select[ip]
+                f[f'tracks/{i_tr:d}/it_start'] = it_start[ip]
+
+                if  it_start[ip] + nsteps[ip] > it_end_glob:
+                    it_end_glob = it_start[ip] + nsteps[ip]
+
                 i_tr += 1
 
         f['misc/cdt'] = dt
         f['misc/N_particles'] = i_tr
+        f['misc/it_start'] = it_start.min()
+        f['misc/it_end'] = it_end_glob
         f['misc/propagation_direction'] = 'z'
         f.close()
         return
@@ -325,6 +321,6 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None,
             particleTracks.append( [x[:nsteps[ip]], y[:nsteps[ip]],
                                     z[:nsteps[ip]], ux[:nsteps[ip]],
                                     uy[:nsteps[ip]], uz[:nsteps[ip]],
-                                    w_select[ip], ] )
+                                    w_select[ip], ], it_start[ip])
 
         return particleTracks, dt
