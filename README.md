@@ -49,30 +49,19 @@ where one can see doc-lines of tracksFromOPMD for more optional arguments.
 The prepared track can be processed and saved to file using following commands:
 ```python
 import numpy as np
-import h5py
 from synchrad.calc import SynchRad
 
-file_tracks = h5py.File('./tracks.h5', mode='r')
-
-calc_input = {'grid':[ (1., 0.6e5),
-                       (0,0.04),
+calc_input = {'grid':[ (1e3/1.24e6, 75e3/1.24e6),
+                       (0, 0.04),
                        (0.,2*np.pi),
                        (256, 32, 32) ],
-              'timeStep':file_tracks['misc/cdt'][()],
               'dtype':'double',
-              'ctx':'mpi',
              }
 
 calc = SynchRad(calc_input)
-calc.calculate_spectrum(h5_file=file_tracks)
-file_tracks.close()
-
-if calc.comm.rank==0:
-    file_spect = h5py.File('./spectrum.h5', mode='w')
-    file_spect['radiation'] = calc.Data['radiation']
-    file_spect.close()
+calc.calculate_spectrum(file_tracks='./tracks.h5',file_spectrum='./spectrum.h5')
 ```
-where radiation within 40 urad angle is calculated for the energies range [0, 74.4 keV].
+where radiation within 40 urad angle is calculated for the energies range [1 keV, 75 keV].
 
 For details on post-processing, one can see the example notebook in `example/`
 
