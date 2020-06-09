@@ -1,4 +1,5 @@
 import numpy as np
+import h5py
 import pyopencl as cl
 import pyopencl.array as arrcl
 from mako.template import Template
@@ -17,7 +18,7 @@ src_path = src_path[0] + '/'
 
 class SynchRad(Utilities):
 
-    def __init__(self, Args={}):
+    def __init__(self, Args={}, file_spectrum=None):
 
         if mpi_installed:
             self.comm = MPI.COMM_WORLD
@@ -26,29 +27,38 @@ class SynchRad(Utilities):
         else:
             self.rank = 0
             self.size = 1
+        if file_spectrum is None:
+            self._init_args(Args)
+            self._init_comm()
+            self._init_data()
+            self._compile_kernels()
+        else:
+            self._read_args(file_spectrum)
 
-        self._init_args(Args)
-        self._init_comm()
-        self._init_data()
-        self._compile_kernels()
-
-    def calculate_spectrum(self, particleTracks=[],
-                           h5_file=None, comp='total', Np_max=None,
-                           nSnaps=1, it_range=None, verbose=True):
+    def calculate_spectrum(self, particleTracks=[], file_tracks=None,
+                           timeStep=None, comp='total', Np_max=None,
+                           nSnaps=1, it_range=None, file_spectrum=None,
+                           verbose=True):
 
         nSnaps = np.uint32(nSnaps)
         self._init_raditaion(comp, nSnaps)
+
+        if timeStep is not None:
+            self.Args['timeStep'] = self.dtype(timeStep)
 
         if it_range is not None:
             it_range = tuple(it_range)
 
         # input from a file
-        if h5_file is not None:
+        if file_tracks is not None:
+            f_tracks = h5py.File(file_tracks, "r")
+
+            self.Args['timeStep'] = self.dtype(f_tracks["misc/cdt"][()])
 
             # determine if it_range is provided
             if it_range is None:
-                if 'it_range' in h5_file['misc'].keys():
-                    it_range = tuple(h5_file['misc/it_range'][()])
+                if 'it_range' in f_tracks['misc'].keys():
+                    it_range = tuple(f_tracks['misc/it_range'][()])
                     self._set_snap_iterations(it_range, nSnaps)
                     if self.rank==0 and verbose:
                         print("it_range from the input file will be used")
@@ -59,20 +69,21 @@ class SynchRad(Utilities):
                 self._set_snap_iterations(it_range, nSnaps)
 
             # set number of tracks to process
-            Np = h5_file['misc/N_particles'][()]
+            Np = f_tracks['misc/N_particles'][()]
             if Np_max is not None:
                 Np = min(Np_max, Np)
 
             # load all tracks for each MPI node
-            particleTracks=[]
+            particleTracks = []
             cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w', 'it_start')
             part_ind = np.arange(Np)[self.rank::self.size]
             for ip in part_ind:
-                track = [h5_file[f"tracks/{ip:d}/{cmp}"][()] for cmp in cmps]
+                track = [f_tracks[f"tracks/{ip:d}/{cmp}"][()] for cmp in cmps]
                 particleTracks.append(track)
 
             if self.rank==0 and verbose:
                 print("Tracks are loaded")
+            f_tracks.close()
 
         # input from a list
         else:
@@ -93,7 +104,9 @@ class SynchRad(Utilities):
 
         # process the tracks
         itr = 0
+        self.total_weight = 0.0
         for track in particleTracks:
+            self.total_weight += track[6]
             track = self._track_to_device(track)
             self._process_track(track, comp, nSnaps, it_range)
             itr += 1
@@ -107,6 +120,29 @@ class SynchRad(Utilities):
         if mpi_installed:
             self._gather_result_mpi()
 
+        if file_spectrum is not None:
+            if self.rank == 0:
+                f_out = h5py.File(file_spectrum, "w")
+                for key in self.Data['radiation'].keys():
+                    f_out['radiation/'+key] = self.Data['radiation'][key]
+
+                ArgsKeys = list(self.Args.keys())
+                ArgsKeys.remove('grid')
+                ArgsKeys.remove('ctx')
+                ArgsKeys.remove('Features')
+                for key in ArgsKeys:
+                    f_out['Args/'+key] = self.Args[key]
+
+                if len(self.Args['Features'])>0:
+                    for key in self.Args['Features'].keys():
+                        f_out['Args/Features'+key] = \
+                          self.Args['Features'][key]
+
+                f_out['snap_iterations'] = self.snap_iterations.get()
+                f_out['total_weight'] = self.total_weight
+
+                print(f"Spectum is saved to {file_spectrum}")
+                f_out.close()
 
     def _process_track(self, particleTrack, comp, nSnaps, it_range):
 
@@ -135,7 +171,7 @@ class SynchRad(Utilities):
         if self.Args['mode'] is 'near':
             args_axes += [ self.dtype(self.Args['grid'][3]), ]
 
-        args_res = [np.uint32(Nn) for Nn in self.Args['grid'][-1]]
+        args_res = [np.uint32(Nn) for Nn in self.Args['gridNodeNums']]
         args_aux = [self.Args['timeStep'], nSnaps, self.snap_iterations.data]
 
         args = args_track + args_axes + args_res + args_aux
@@ -174,23 +210,18 @@ class SynchRad(Utilities):
                 print ( 'WARNING: Chosen single precision is not ' + \
                         'recommended for the nearfield calculations\n' )
 
-        if 'timeStep' not in self.Args.keys():
-            raise KeyError("timeStep must be defined.")
-        else:
-            self.Args['timeStep'] = self.dtype(self.Args['timeStep'])
-
         if 'ctx' not in self.Args.keys():
             self.Args['ctx'] = None
 
         if 'Features' not in self.Args.keys():
             self.Args['Features'] = {}
 
-        gridNodeNums = self.Args['grid'][-1]
+        self.Args['gridNodeNums'] = self.Args['grid'][-1]
 
-        self.Args['numGridNodes'] = int(np.prod(gridNodeNums))
+        self.Args['numGridNodes'] = int(np.prod(self.Args['gridNodeNums']))
 
         omega_min, omega_max = self.Args['grid'][0]
-        No = gridNodeNums[0]
+        No = self.Args['gridNodeNums'][0]
         if 'wavelengthGrid' in self.Args['Features']:
             self.Args['wavelengths'] = np.r_[1./omega_max:1./omega_min:No*1j]
             omega = 1./self.Args['wavelengths']
@@ -208,7 +239,7 @@ class SynchRad(Utilities):
             self.Args['dw'] = np.array([1.,], dtype=self.dtype)
 
         if self.Args['mode'] == 'far':
-            Nt, Np = gridNodeNums[1:]
+            Nt, Np = self.Args['gridNodeNums'][1:]
             theta_min, theta_max  = self.Args['grid'][1]
             phi_min, phi_max = self.Args['grid'][2]
 
@@ -254,7 +285,7 @@ class SynchRad(Utilities):
 
     def _init_raditaion(self, comp, nSnaps):
 
-        radiation_shape = tuple(self.Args['grid'][-1][::-1])
+        radiation_shape = tuple(self.Args['gridNodeNums'][::-1])
         radiation_shape = (nSnaps, ) + radiation_shape
 
         vec_comps = {'cartesian':['x', 'y', 'z'],
@@ -352,6 +383,9 @@ class SynchRad(Utilities):
             self.comm.barrier()
             self.Data['radiation'][key] = buff
 
+        self.comm.barrier()
+        self.total_weight = self.comm.reduce(self.total_weight)
+
     def _spectr_from_device(self, nSnaps):
         for key in self.Data['radiation'].keys():
             buff = self.Data['radiation'][key].get().swapaxes(-1,-3)
@@ -415,7 +449,6 @@ class SynchRad(Utilities):
 
     def _set_global_working_group_size(self):
         # self.WGS = self.ctx.devices[0].max_work_group_size
-
         if self.dev_type=='CPU':
             self.WGS = 32
         else:
@@ -428,3 +461,26 @@ class SynchRad(Utilities):
             WGS_tot = int(np.ceil(1.*Nelem/self.WGS))*self.WGS
             WGS = self.WGS
             return WGS, WGS_tot
+
+    def _read_args(self, file_spectrum):
+        if self.rank == 0:
+            self.Data = {}
+            self.Data['radiation'] = {}
+            self.Args = {}
+            self.Args['Features'] = {}
+
+            with h5py.File(file_spectrum, "r") as f:
+                for key in f['radiation'].keys():
+                    self.Data['radiation'][key] = f['radiation/'+key][()]
+
+                ArgsKeys = list(f['Args'].keys())
+                if 'Features' in ArgsKeys:
+                    ArgsKeys.remove('Features')
+                    for key in f['Args/Features'].keys():
+                        self.Args['Features'][key] = f['Args/Features'+key][()]
+
+                for key in ArgsKeys:
+                    self.Args[key] = f['Args/'+key][()]
+
+                self.snap_iterations = f['snap_iterations'][()]
+                self.total_weight = f['total_weight'][()]

@@ -308,8 +308,7 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, species=None,
 
         f['misc/cdt'] = dt
         f['misc/N_particles'] = i_tr
-        f['misc/it_start'] = it_start.min()
-        f['misc/it_end'] = it_end_glob
+        f['misc/it_range'] = np.array([it_start.min(), it_end_glob])
         f['misc/propagation_direction'] = 'z'
         f.close()
         return

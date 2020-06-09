@@ -115,7 +115,7 @@ if __name__ == "__main__":
         Nm,
         dt,
         zmin=zmin,
-        boundaries="open",
+        boundaries={'z':'open', 'r':'reflective'},
         n_order=n_order,
         use_cuda=use_cuda,
     )

@@ -54,12 +54,11 @@ for g0_p in g0 + dg * np.random.randn(Np):
 calc_input = {
     "grid": [
         (0.02 * k_res, 1.1 * k_res),  # Wavenumber mapping region
-        (0, 2.0 / g0),  # Elevation (theta) angle region
-        (0.0, 2 * np.pi),  # Rotation (phi) angle
-        (128, 32, 32),
-    ],  # Corresponding resolutions
-    "timeStep": dt,  # normalized timestep
-    # 'ctx':'mpi',                        # OpenCL context (leave commented to be asked)
+        (0, 2.0 / g0),                # Elevation (theta) angle region
+        (0.0, 2 * np.pi),             # Rotation (phi) angle
+        (128, 32, 32),                # Corresponding resolutions
+    ],
+    # 'ctx':'mpi',                    # OpenCL context (leave commented to be asked)
 }
 
 print("Running default mode with double precision")
@@ -67,7 +66,7 @@ print("Running default mode with double precision")
 calc = SynchRad(calc_input)
 
 t0 = time.time()
-calc.calculate_spectrum(particleTracks.copy(), comp="total", Np_max=Np)
+calc.calculate_spectrum(particleTracks.copy(), timeStep=dt, comp="total", Np_max=Np)
 
 if calc.rank == 0:
     print(
@@ -101,7 +100,7 @@ calc._init_data()
 calc._compile_kernels()
 
 t0 = time.time()
-calc.calculate_spectrum(particleTracks.copy(), comp="total", Np_max=Np)
+calc.calculate_spectrum(particleTracks.copy(), timeStep=dt, comp="total", Np_max=Np)
 
 if calc.rank == 0:
     print(

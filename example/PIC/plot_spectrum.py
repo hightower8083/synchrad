@@ -3,6 +3,7 @@ import numpy as np
 from matplotlib import pyplot
 from openpmd_viewer.addons.pic import LpaDiagnostics
 from sliceplots import plot_multicolored_line, addcolorbar, Plot2D
+from scipy.constants import e
 
 from synchrad.calc import SynchRad
 
@@ -50,37 +51,31 @@ if __name__ == "__main__":
         for particle_index in range(number_of_particles):
             total_particle_weight += f[f"tracks/{particle_index}/w"][...]
 
-    calc_input = {
-        "grid": [(1e1, 1.2e4), (0, 0.03), (0.0, 2 * np.pi), (256, 36, 36)],
-        "timeStep": time_step,
-        "dtype": "double",
-        "native": False,
-        "ctx": False,
-    }
-    calc = SynchRad(calc_input)
+    calc = SynchRad(file_spectrum="spectrum.h5")
 
-    with h5py.File("spectrum.h5", "r") as f:
-        calc.Data["radiation"] = {}
-        for key in f["radiation"].keys():
-            calc.Data["radiation"][key] = f[f"radiation/{key}"][...] / total_particle_weight
+#    with h5py.File("spectrum.h5", "r") as f:
+#        calc.Data["radiation"] = {}
+#        for key in f["radiation"].keys():
+#            calc.Data["radiation"][key] = f[f"radiation/{key}"][...] / total_particle_weight
 
     # compute total emitted energy
     E_cutoff = 1.0  # keV
-    eph_keV_um = 1.24e-3
+    eph_keV_m = 1.24e-9
 
     spectral_axis = calc.get_spectral_axis()
-    energy_axis = spectral_axis * eph_keV_um
-    energy_axis_full = calc.Args["omega"] * eph_keV_um
+    energy_axis = spectral_axis * eph_keV_m
+    energy_axis_full = calc.Args["omega"] * eph_keV_m
     spect_filter = (energy_axis_full > E_cutoff)[:, np.newaxis, np.newaxis]
 
     energy_tot = calc.get_energy(
-        lambda0_um=1.0, phot_num=False, spect_filter=spect_filter
+        lambda0_um=1e6, phot_num=False, spect_filter=spect_filter
     )
-    print(f"Total energy emitted in >{E_cutoff:g} keV: {energy_tot * 1e15:g} pJ")
+    energy_per_C = energy_tot/(e*calc.total_weight)
+    print(f"Total energy emitted in >{E_cutoff:g} keV: {energy_per_C:g} J/C")
 
     # plot energy spectrum
     pyplot.figure()
-    energy_spectrum1D = calc.get_energy_spectrum(lambda0_um=1.0)
+    energy_spectrum1D = calc.get_energy_spectrum(lambda0_um=1e6)
     pyplot.semilogx(energy_axis, energy_spectrum1D)
     pyplot.xlabel("Photon energy (keV)")
     pyplot.ylabel("Brightness (ph./0.1%b.w./e$^-$)")
