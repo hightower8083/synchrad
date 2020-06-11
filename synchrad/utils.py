@@ -323,3 +323,71 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, species=None,
                                     w_select[ip], ], it_start[ip])
 
         return particleTracks, dt
+
+def tracksFromVSIM(file_vsim, file_synchrad,
+                   dt_phys, length_unit=1, dNit=1,
+                   dNp=None, Np_select=None, verbose=True):
+
+    cdt_phys = dt_phys*c
+    dt = cdt_phys/length_unit
+
+    f_trk_orig = h5py.File(file_vsim, mode='r')
+    f_trk_synch = h5py.File(file_synchrad, mode='w')
+
+    Nt, Np, _ = f_trk_orig['tracks'].shape
+    data_fields = f_trk_orig.keys()
+
+    if ('numPhysElectrons' in data_fields) and ('numElectrons' in data_fields):
+        w0 = f_in['numPhysElectrons'][()][0]/f_in['numElectrons'][()][0]
+    else:
+        w0 = 1.0
+
+    N_tr = 0
+    it_end_glob = 0
+    it_start_glob = np.inf
+
+    ip_indices = np.arange(Np)
+
+    if dNp is not None:
+        ip_indices = ip_indices[::dNp]
+
+    if Np_select is not None:
+        ip_indices = ip_indices[:Np_select]
+
+    for ip in ip_indices:
+        # switch axes for z-propagation
+        z, y, x, uz, uy, ux = f_trk_orig['tracks'][::dNit, ip, :].T
+
+        # discard out-of-box particles
+        ind_select = np.nonzero(x>0)[0]
+        it_start = ind_select[0]
+        nsteps = ind_select.size
+
+        x, y, z, ux, uy, uz = [v[ind_select] for v in [x, y, z, ux, uy, uz]]
+
+        if it_start < it_start_glob:
+            it_start_glob = it_start
+
+        if len(z)>8 :
+            f_trk_synch[f'tracks/{N_tr:d}/x'] = x/length_unit
+            f_trk_synch[f'tracks/{N_tr:d}/y'] = y/length_unit
+            f_trk_synch[f'tracks/{N_tr:d}/z'] = z/length_unit
+            f_trk_synch[f'tracks/{N_tr:d}/ux'] = ux/c
+            f_trk_synch[f'tracks/{N_tr:d}/uy'] = uy/c
+            f_trk_synch[f'tracks/{N_tr:d}/uz'] = uz/c
+            f_trk_synch[f'tracks/{N_tr:d}/w'] = w0
+            f_trk_synch[f'tracks/{N_tr:d}/it_start'] = it_start
+            N_tr += 1
+
+            if  it_start + nsteps > it_end_glob:
+                it_end_glob = it_start + nsteps
+
+    f_trk_synch['misc/cdt'] = dt * dNit
+    f_trk_synch['misc/N_particles'] = N_tr
+    f_trk_synch['misc/it_range'] = np.array([it_start_glob, it_end_glob])
+    f_trk_synch['misc/propagation_direction'] = 'z'
+
+    f_trk_orig.close()
+    f_trk_synch.close()
+    if verbose:
+        print(f'written {N_tr} tracks to {file_synchrad}')

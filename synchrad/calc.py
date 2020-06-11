@@ -141,7 +141,7 @@ class SynchRad(Utilities):
                 f_out['snap_iterations'] = self.snap_iterations.get()
                 f_out['total_weight'] = self.total_weight
 
-                print(f"Spectum is saved to {file_spectrum}")
+                print(f"Spectrum is saved to {file_spectrum}")
                 f_out.close()
 
     def _process_track(self, particleTrack, comp, nSnaps, it_range):
