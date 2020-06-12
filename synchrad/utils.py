@@ -168,6 +168,9 @@ class Utilities:
         return val, ext
 
     def get_spectral_axis(self):
+        if 'Features' not in self.Args.keys():
+            self.Args['Features'] = []
+
         if 'wavelengthGrid' in self.Args['Features']:
             ax = 0.5*(self.Args['wavelengths'][1:] \
               + self.Args['wavelengths'][:-1])
