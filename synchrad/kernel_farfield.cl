@@ -98,9 +98,9 @@ __kernel void spheric_comps(
 
           amplitude = c1*(nVec - uLocal) - c2*aLocal;
 
-          amplSpheric.s0 = dot(nVec,amplitude);
-          amplSpheric.s1 = dot(thVec,amplitude);
-          amplSpheric.s2 = dot(phVec,amplitude);
+          amplSpheric.s0 = dot(nVec, amplitude);
+          amplSpheric.s1 = dot(thVec, amplitude);
+          amplSpheric.s2 = dot(phVec, amplitude);
           amplitude = amplSpheric;
 
           spectrLocalRe += amplitude * cosPhase;

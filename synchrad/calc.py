@@ -129,14 +129,8 @@ class SynchRad(Utilities):
                 ArgsKeys = list(self.Args.keys())
                 ArgsKeys.remove('grid')
                 ArgsKeys.remove('ctx')
-                ArgsKeys.remove('Features')
                 for key in ArgsKeys:
                     f_out['Args/'+key] = self.Args[key]
-
-                if len(self.Args['Features'])>0:
-                    for key in self.Args['Features'].keys():
-                        f_out['Args/Features'+key] = \
-                          self.Args['Features'][key]
 
                 f_out['snap_iterations'] = self.snap_iterations.get()
                 f_out['total_weight'] = self.total_weight
@@ -179,7 +173,6 @@ class SynchRad(Utilities):
         if comp is 'total':
             self._mapper.total(self.queue, (WGS_tot, ), (WGS, ),
                                spect['total'].data, *args)
-
         elif comp is 'cartesian':
             self._mapper.cartesian_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['x'].data, spect['y'].data, spect['z'].data, *args)
@@ -213,15 +206,15 @@ class SynchRad(Utilities):
         if 'ctx' not in self.Args.keys():
             self.Args['ctx'] = None
 
-        if 'Features' not in self.Args.keys():
-            self.Args['Features'] = {}
-
         self.Args['gridNodeNums'] = self.Args['grid'][-1]
-
         self.Args['numGridNodes'] = int(np.prod(self.Args['gridNodeNums']))
 
-        omega_min, omega_max = self.Args['grid'][0]
         No = self.Args['gridNodeNums'][0]
+        omega_min, omega_max = self.Args['grid'][0]
+
+        if 'Features' not in self.Args.keys():
+            self.Args['Features'] = []
+
         if 'wavelengthGrid' in self.Args['Features']:
             self.Args['wavelengths'] = np.r_[1./omega_max:1./omega_min:No*1j]
             omega = 1./self.Args['wavelengths']
@@ -467,19 +460,12 @@ class SynchRad(Utilities):
             self.Data = {}
             self.Data['radiation'] = {}
             self.Args = {}
-            self.Args['Features'] = {}
 
             with h5py.File(file_spectrum, "r") as f:
                 for key in f['radiation'].keys():
                     self.Data['radiation'][key] = f['radiation/'+key][()]
 
-                ArgsKeys = list(f['Args'].keys())
-                if 'Features' in ArgsKeys:
-                    ArgsKeys.remove('Features')
-                    for key in f['Args/Features'].keys():
-                        self.Args['Features'][key] = f['Args/Features'+key][()]
-
-                for key in ArgsKeys:
+                for key in f['Args'].keys():
                     self.Args[key] = f['Args/'+key][()]
 
                 self.snap_iterations = f['snap_iterations'][()]

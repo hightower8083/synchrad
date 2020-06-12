@@ -325,11 +325,10 @@ def tracksFromOPMD(ts, pt, ref_iteration, fname=None, species=None,
         return particleTracks, dt
 
 def tracksFromVSIM(file_vsim, file_synchrad,
-                   dt_phys, length_unit=1, dNit=1,
+                   cdt, length_unit=1, dNit=1,
                    dNp=None, Np_select=None, verbose=True):
 
-    cdt_phys = dt_phys*c
-    dt = cdt_phys/length_unit
+    dt = cdt/length_unit
 
     f_trk_orig = h5py.File(file_vsim, mode='r')
     f_trk_synch = h5py.File(file_synchrad, mode='w')
@@ -337,10 +336,8 @@ def tracksFromVSIM(file_vsim, file_synchrad,
     Nt, Np, _ = f_trk_orig['tracks'].shape
     data_fields = f_trk_orig.keys()
 
-    if ('numPhysElectrons' in data_fields) and ('numElectrons' in data_fields):
-        w0 = f_in['numPhysElectrons'][()][0]/f_in['numElectrons'][()][0]
-    else:
-        w0 = 1.0
+    # unless there's any useful data
+    w0 = 1.0
 
     N_tr = 0
     it_end_glob = 0
