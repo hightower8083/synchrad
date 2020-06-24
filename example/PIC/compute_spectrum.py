@@ -10,7 +10,7 @@ if __name__ == "__main__":
                   (256, 36, 36)],
         "dtype": "double",
         "native": False,
-        "ctx": [0, 0],
+        # "ctx": [0, 0], set your context to avoid being asked
     }
 
     calc = SynchRad(calc_input)
