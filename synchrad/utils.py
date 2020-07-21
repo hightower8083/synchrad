@@ -85,12 +85,8 @@ class Utilities:
             ax = self.Args['omega']
             val /= ax[:,None,None]
         else:
-            val *= J_in_um
-            if lambda0_um is None:
-                print("Specify normalization wavelength in "+\
-                  "microns (lambda0_um) ")
-                return  np.zeros_like(val)
-            val /= lambda0_um
+            if lambda0_um is not None:
+                val *= J_in_um / lambda0_um
 
         return val
 
