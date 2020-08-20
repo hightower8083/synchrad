@@ -305,35 +305,38 @@ __kernel void total(
         time = (${my_dtype})it * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
-        phase = omegaLocal * (time - dot(xLocal, nVec)) ;
-        dPhase = fabs(phase - phasePrev);
-        phasePrev = phase;
-
-        if (dPhase < (${my_dtype})M_PI)
+        if (dot(xLocal,xLocal) > (${my_dtype})0.0 )
         {
-          uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
-          uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
+          phase = omegaLocal * (time - dot(xLocal, nVec)) ;
+          dPhase = fabs(phase - phasePrev);
+          phasePrev = phase;
 
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
-          uLocal *= gammaInv;
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
-          uNextLocal *= gammaInv;
+          if (dPhase < (${my_dtype})M_PI)
+          {
+            uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
+            uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
 
-          aLocal = (uNextLocal - uLocal) * dtInv;
-          uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
+            gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
+            uLocal *= gammaInv;
+            gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
+            uNextLocal *= gammaInv;
 
-          c1 = dot(aLocal, nVec);
-          c2 = (${my_dtype})1. - dot(uLocal, nVec);
+            aLocal = (uNextLocal - uLocal) * dtInv;
+            uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
 
-          c2 =  (${my_dtype})1. / c2;
-          c1 = c1*c2*c2;
+            c1 = dot(aLocal, nVec);
+            c2 = (${my_dtype})1. - dot(uLocal, nVec);
 
-          sinPhase = ${f_native}sin(phase);
-          cosPhase = ${f_native}cos(phase);
+            c2 =  (${my_dtype})1. / c2;
+            c1 = c1*c2*c2;
 
-          amplitude = c1*(nVec - uLocal) - c2*aLocal;
-          spectrLocalRe += amplitude * cosPhase;
-          spectrLocalIm += amplitude * sinPhase;
+            sinPhase = ${f_native}sin(phase);
+            cosPhase = ${f_native}cos(phase);
+
+            amplitude = c1*(nVec - uLocal) - c2*aLocal;
+            spectrLocalRe += amplitude * cosPhase;
+            spectrLocalIm += amplitude * sinPhase;
+          }
         }
       }
 

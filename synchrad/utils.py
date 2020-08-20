@@ -22,17 +22,25 @@ def record_particles_step(tracks, nsteps, it, it_start,
         ip_glob = ip*dNp
 
         if np.isnan(x[ip_glob]):
-            continue
+            if it_start[ip]==0:
+                it_start[ip] = it
 
-        if it_start[ip]==0:
-            it_start[ip] = it
+            point = [ 0., 0., 0.,
+                      0., 0., 0.,
+                      id[ip_glob] ]
 
-        point = [ x[ip_glob], y[ip_glob], z[ip_glob],
-                  ux[ip_glob], uy[ip_glob], uz[ip_glob],
-                  id[ip_glob] ]
+            tracks[nsteps[ip], ip, :] = point
+            nsteps[ip] += 1
+        else:
+            if it_start[ip]==0:
+                it_start[ip] = it
 
-        tracks[nsteps[ip], ip, :] = point
-        nsteps[ip] += 1
+            point = [ x[ip_glob], y[ip_glob], z[ip_glob],
+                      ux[ip_glob], uy[ip_glob], uz[ip_glob],
+                      id[ip_glob] ]
+
+            tracks[nsteps[ip], ip, :] = point
+            nsteps[ip] += 1
 
     return tracks, nsteps, it_start
 
@@ -40,19 +48,27 @@ def record_particles_step(tracks, nsteps, it, it_start,
 def record_particles_first(tracks, nsteps, it, it_start,
                            x, y, z, ux, uy, uz, id,
                            Np_select):
+
     for ip in range(Np_select):
 
         if np.isnan(x[ip]):
-            continue
+            if it_start[ip]==0:
+                it_start[ip] = it
 
-        if it_start[ip]==0:
-            it_start[ip] = it
+            point = [ 0., 0., 0.,
+                      0., 0., 0., id[ip] ]
 
-        point = [ x[ip], y[ip], z[ip],
-                  ux[ip], uy[ip], uz[ip], id[ip] ]
+            tracks[nsteps[ip], ip, :] = point
+            nsteps[ip] += 1
+        else:
+            if it_start[ip]==0:
+                it_start[ip] = it
 
-        tracks[nsteps[ip], ip, :] = point
-        nsteps[ip] += 1
+            point = [ x[ip], y[ip], z[ip],
+                      ux[ip], uy[ip], uz[ip], id[ip] ]
+
+            tracks[nsteps[ip], ip, :] = point
+            nsteps[ip] += 1
 
     return tracks, nsteps, it_start
 
