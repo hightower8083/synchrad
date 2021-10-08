@@ -51,7 +51,7 @@ The prepared track can be processed and saved to file using following commands:
 import numpy as np
 from synchrad.calc import SynchRad
 
-calc_input = {'grid':[ (1e3/1.24e6, 75e3/1.24e6),
+calc_input = {'grid':[ (1e3/1.24e-6, 75e3/1.24e-6),
                        (0, 0.04),
                        (0.,2*np.pi),
                        (256, 32, 32) ],
