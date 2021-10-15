@@ -177,6 +177,13 @@ class SynchRad(Utilities):
             self._mapper.cartesian_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['x'].data, spect['y'].data, spect['z'].data, *args)
 
+        elif comp is 'cartesian_complex':
+            self._mapper.cartesian_comps_complex(self.queue, (WGS_tot, ), (WGS, ),
+            spect['xre'].data, spect['xim'].data,
+            spect['yre'].data, spect['yim'].data,
+            spect['zre'].data, spect['zim'].data,
+            *args)
+
         elif comp is 'spheric':
             self._mapper.spheric_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['r'].data, spect['theta'].data, spect['phi'].data, *args)
@@ -282,10 +289,13 @@ class SynchRad(Utilities):
         radiation_shape = (nSnaps, ) + radiation_shape
 
         vec_comps = {'cartesian':['x', 'y', 'z'],
+                     'cartesian_complex':['xre', 'xim','yre', 'yim', 'zre', 'zim'],
                      'spheric':['r', 'theta', 'phi'],
                      'total': ['total',]
                      }
 
+        self.Args['comp'] = comp
+        self.Args['vec_comps'] = vec_comps
         self.Data['radiation'] = {}
 
         for vec_comp in vec_comps[comp]:
