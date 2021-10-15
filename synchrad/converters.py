@@ -3,9 +3,6 @@ from scipy.constants import c
 import h5py
 from numba import njit, jit
 
-#pt = ParticleTracker(ts, iteration=ref_iteration,
-#                     select=id_select,
-#                     preserve_particle_index=True)
 
 def tracksFromOPMD(ts, pt, ref_iteration,
                    fname='./tracks.h5',
@@ -24,18 +21,18 @@ def tracksFromOPMD(ts, pt, ref_iteration,
               f"Only {all_pid.size} tracks are available in ParticleTracker")
 
         if sample_selection == 'random':
-            pt.selected_pid = np.random.choice(all_pid, size=Np_select)
+            selected_pid = np.random.choice(all_pid, size=Np_select)
         elif sample_selection == 'sequential':
-            pt.selected_pid = all_pid[:Np_select]
+            selected_pid = all_pid[:Np_select]
         else:
             print(f"Selected sampling method '{sample_selection}' is ",
                    "not available.")
 
     if dNp>1:
-        pt.selected_pid = pt.selected_pid[::dNp]
+        selected_pid = selected_pid[::dNp]
 
-    pt.selected_pid.sort()
-    pt.N_selected = len( pt.selected_pid )
+    pt.__init__( ts, species=pt.species, iteration=ref_iteration,
+                select=selected_pid, preserve_particle_index=True)
 
     iterations = ts.iterations.copy()
     t = ts.t.copy()
@@ -59,21 +56,9 @@ def tracksFromOPMD(ts, pt, ref_iteration,
     TC['x'], TC['y'], TC['z'], TC['ux'], TC['uy'], TC['uz'], TC['w'] = \
         ts.iterate(ts.get_particle, select=pt, var_list=var_list)
 
-    # find and remove possible empty lists at start (to be removed later)
-    it_start_global = 0
-    """
+    # find and temporarily replace the non-consistent lists with NaNs
     for itLoc, valLoc in enumerate(TC['x']):
-        if len(valLoc) == pt.N_selected:
-            it_start_global = itLoc
-            break
-
-    for var in var_list:
-        TC[var] = TC[var][it_start_global:]
-    """
-
-    # find and if any replace temporarily empty lists with NaNs
-    for itLoc, valLoc in enumerate(TC['x']):
-        if len(valLoc) == 0:
+        if len(valLoc) != pt.N_selected:
             for var in var_list:
                 TC[var][itLoc] = np.nan*np.empty(pt.N_selected)
 
@@ -82,10 +67,11 @@ def tracksFromOPMD(ts, pt, ref_iteration,
         TC[var] = np.array(TC[var], order='F').T
 
     # temporal patch to select iterations -- should go ts.iterate
-    for var in var_list:
-        TC[var] = TC[var][:, iteration_ind]
+    #for var in var_list:
+    #    TC[var] = TC[var][:, iteration_ind]
 
     i_tr = 0
+    it_start_global = np.inf
     it_end_global = 0
     f = h5py.File(fname, mode='w')
 
@@ -105,11 +91,14 @@ def tracksFromOPMD(ts, pt, ref_iteration,
                 f[f'tracks/{i_tr:d}/uy'] = uy
                 f[f'tracks/{i_tr:d}/uz'] = uz
                 f[f'tracks/{i_tr:d}/w'] = w
-                f[f'tracks/{i_tr:d}/it_start'] = it_start + it_start_global
+                f[f'tracks/{i_tr:d}/it_start'] = it_start
 
-                it_end_local = it_start + it_start_global + nsteps
+                it_end_local = it_start + nsteps
                 if it_end_global < it_end_local:
                     it_end_global = it_end_local
+
+                if it_start_global>it_start:
+                    it_start_global = it_start
 
                 i_tr += 1
 
