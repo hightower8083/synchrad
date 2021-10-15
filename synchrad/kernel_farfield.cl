@@ -375,7 +375,8 @@ __kernel void cartesian_comps_complex(
                   uint nPhi,
            ${my_dtype} dt,
                   uint nSnaps,
-  __global        uint *itSnaps)
+  __global        uint *itSnaps,
+  __global ${my_dtype} *FormFactor)
 {
   uint gti = (uint) get_global_id(0);
   uint nTotal = nTheta*nPhi*nOmega;
@@ -391,6 +392,7 @@ __kernel void cartesian_comps_complex(
                                          sinTheta[iTheta]*sinPhi[iPhi],
                                          cosTheta[iTheta] };
 
+    ${my_dtype} FormFactorLocal = FormFactor[iOmega];
     ${my_dtype}3 xLocal, uLocal, uNextLocal, aLocal, amplitude;
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
 
@@ -443,8 +445,8 @@ __kernel void cartesian_comps_complex(
 
           amplitude = c1*(nVec - uLocal) - c2*aLocal;
 
-          spectrLocalRe += amplitude * cosPhase;
-          spectrLocalIm += amplitude * sinPhase;
+          spectrLocalRe += amplitude * cosPhase * FormFactorLocal;
+          spectrLocalIm += amplitude * sinPhase * FormFactorLocal;
         }
       }
 
