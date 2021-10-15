@@ -18,7 +18,9 @@ J_in_um = 2e6*np.pi*hbar*c
 class Utilities:
 
     def get_full_spectrum(self, spect_filter=None, \
-                          phot_num=False, lambda0_um=None,
+                          phot_num=False,
+                          lambda0_um=None,
+                          normalize_to_weights=False,
                           comp='total', iteration=-1):
 
         keys = self.Data['radiation'].keys()
@@ -38,6 +40,9 @@ class Utilities:
 
         if spect_filter is not None:
             val *= spect_filter
+
+        if normalize_to_weights:
+            val /= self.total_weight
 
         if phot_num:
             ax = self.Args['omega']
