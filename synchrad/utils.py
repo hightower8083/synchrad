@@ -26,11 +26,20 @@ class Utilities:
         keys = self.Data['radiation'].keys()
 
         val = 0.0
-        if comp=='total':
-            for key in keys:
-                val += self.Data['radiation'][key][iteration].astype(np.double)
+
+        if self.Args['comp'].split('_')[-1] == 'complex':
+            if comp=='total':
+                for key in keys:
+                    val += self.Data['radiation'][key][iteration].astype(np.double)**2
+            else:
+                val += np.abs( self.Data['radiation'][comp+'re'][iteration].astype(np.double) \
+                    + 1j * self.Data['radiation'][comp+'im'][iteration].astype(np.double))
         else:
-            val += self.Data['radiation'][ comp][iteration].astype(np.double)
+            if comp=='total':
+                for key in keys:
+                    val += self.Data['radiation'][key][iteration].astype(np.double)
+            else:
+                val += self.Data['radiation'][comp][iteration].astype(np.double)
 
         if self.Args['mode'] == 'far':
             val = alpha_fs / (4 * np.pi**2) * val
@@ -130,11 +139,13 @@ class Utilities:
         if 'Features' not in self.Args.keys():
             self.Args['Features'] = []
 
-        if 'wavelengthGrid' in self.Args['Features']:
-            ax = 0.5*(self.Args['wavelengths'][1:] \
-              + self.Args['wavelengths'][:-1])
-        else:
-            ax = 0.5*(self.Args['omega'][1:] + self.Args['omega'][:-1])
+        ax = 0.5*(self.Args['omega'][1:] + self.Args['omega'][:-1])
+        for feature in self.Args['Features']:
+            if feature == 'wavelengthGrid':
+                ax = 0.5*(self.Args['wavelengths'][1:] \
+                    + self.Args['wavelengths'][:-1])
+                break
+
         return ax
 
     def exportToVTK( self, spect_filter=None, phot_num=False,\

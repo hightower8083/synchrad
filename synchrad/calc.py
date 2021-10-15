@@ -35,11 +35,12 @@ class SynchRad(Utilities):
         else:
             self._read_args(file_spectrum)
 
-    def calculate_spectrum(self, particleTracks=[], file_tracks=None,
-                           timeStep=None, comp='total', Np_max=None,
-                           nSnaps=1, it_range=None, file_spectrum=None,
-                           verbose=True):
+    def calculate_spectrum(self, particleTracks=[], file_tracks=None, timeStep=None,
+                           comp='total', sigma_particle=0,
+                           Np_max=None, nSnaps=1, it_range=None,
+                           file_spectrum=None, verbose=True):
 
+        self.Args['sigma_particle'] = self.dtype(sigma_particle)
         nSnaps = np.uint32(nSnaps)
         self._init_raditaion(comp, nSnaps)
 
@@ -177,6 +178,15 @@ class SynchRad(Utilities):
             self._mapper.cartesian_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['x'].data, spect['y'].data, spect['z'].data, *args)
 
+        elif comp is 'cartesian_complex':
+            arg_FormFactor = [self.Data['FormFactor'].data,]
+            args += arg_FormFactor
+            self._mapper.cartesian_comps_complex(self.queue, (WGS_tot, ), (WGS, ),
+            spect['xre'].data, spect['xim'].data,
+            spect['yre'].data, spect['yim'].data,
+            spect['zre'].data, spect['zim'].data,
+            *args)
+
         elif comp is 'spheric':
             self._mapper.spheric_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['r'].data, spect['theta'].data, spect['phi'].data, *args)
@@ -215,14 +225,16 @@ class SynchRad(Utilities):
         if 'Features' not in self.Args.keys():
             self.Args['Features'] = []
 
-        if 'wavelengthGrid' in self.Args['Features']:
-            self.Args['wavelengths'] = np.r_[1./omega_max:1./omega_min:No*1j]
-            omega = 1./self.Args['wavelengths']
-        elif 'logGrid' in self.Args['Features']:
-            d_log_w = np.log(omega_max/omega_min) / (No-1.0)
-            omega = omega_min * np.exp( d_log_w*np.arange(No)  )
-        else:
-            omega = np.r_[omega_min:omega_max:No*1j]
+        omega = np.r_[omega_min:omega_max:No*1j]
+        for feature in self.Args['Features']:
+            if feature == 'wavelengthGrid':
+                self.Args['wavelengths'] = np.r_[1./omega_max:1./omega_min:No*1j]
+                omega = 1./self.Args['wavelengths']
+                break
+            elif feature == 'logGrid':
+                d_log_w = np.log(omega_max/omega_min) / (No-1.0)
+                omega = omega_min * np.exp( d_log_w*np.arange(No)  )
+                break
 
         self.Args['omega'] = omega.astype(self.dtype)
 
@@ -282,11 +294,17 @@ class SynchRad(Utilities):
         radiation_shape = (nSnaps, ) + radiation_shape
 
         vec_comps = {'cartesian':['x', 'y', 'z'],
+                     'cartesian_complex':['xre', 'xim','yre', 'yim', 'zre', 'zim'],
                      'spheric':['r', 'theta', 'phi'],
                      'total': ['total',]
                      }
 
+        self.Args['comp'] = comp
         self.Data['radiation'] = {}
+
+        omega_loc = self.dtype(2*np.pi) * self.Args['omega']
+        self.Data['FormFactor'] = arrcl.to_device( self.queue,
+            np.exp( self.dtype(-0.5) * (omega_loc*self.Args['sigma_particle'])**2 ) )
 
         for vec_comp in vec_comps[comp]:
             self.Data['radiation'][vec_comp] = \
@@ -301,7 +319,7 @@ class SynchRad(Utilities):
 
         # Note that dw is not multiplied by 2*pi
         self.Data['omega'] = arrcl.to_device( self.queue,
-                                 self.dtype(2*np.pi)*self.Args['omega'] )
+                                 self.dtype(2*np.pi) * self.Args['omega'] )
 
         if self.Args['mode'] is 'far':
             self.Data['sinTheta'] = arrcl.to_device( self.queue,
