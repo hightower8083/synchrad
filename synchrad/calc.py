@@ -119,8 +119,10 @@ class SynchRad(Utilities):
                 `SUM_tracks(|A_r|^2), SUM_tracks(|A_theta|^2), SUM_tracks(|A_phi|^2)`
               'cartesian_comples': record Cartesian components coherently, e.g.
                 `SUM_tracks(A_x), SUM_tracks(A_y), SUM_tracks(A_z)`
+
         sigma_particle: double (optional)
             Define size of the particle in distance units using Gaussian form factor
+
         Np_max: integer
             Define a number of tracks to use in calculation
 
