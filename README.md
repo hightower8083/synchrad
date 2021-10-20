@@ -63,7 +63,7 @@ calc.calculate_spectrum(file_tracks='./tracks.h5',file_spectrum='./spectrum.h5')
 ```
 where radiation within 40 urad angle is calculated for the energies range [1 keV, 75 keV].
 
-For details on post-processing, one can see the example notebook in `example/`
+For more details see the example notebooks in `tutorials/`
 
 
 ## Author and Contributions
