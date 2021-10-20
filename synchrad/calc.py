@@ -17,8 +17,56 @@ src_path = src_path[0] + '/'
 
 
 class SynchRad(Utilities):
+    """
+    Main class of SynchRad which contains all methods for construction
+    of SR calculator object, running calculation, importing track data
+    and exporting the radiation data. Inheritesmethods to analyze the
+    simulation results.
+    """
 
     def __init__(self, Args={}, file_spectrum=None):
+        """
+        Initializes SynchRad using either a dictionary `Args` with calculation
+        parameters or exporting simulation from the file `file_spectrum`.
+        When initializing from file_spectrum` the file, should be created from
+        an executed simulation by the `calculate_spectrum` method
+
+        Arguments available in `Args` dictionary
+        ----------
+        grid: list
+            List of parameters to construct a grid in the 3D shperical
+            coordinates `(omega, theta, phi)`, where frequency omega is
+            in the units of `2*pi*c/lambda_u` with `lambda_u` being unit
+            distance used for tracked corrdinates, and `theta` and `phi`
+            are the elevation and rotation angles in radians. Format:
+            "grid": [
+                      (omega_min, omega_max),
+                      (theta_min, theta_max),
+                      (phi_min, phi_max),
+                      (N_omega, N_theta, N_phi),
+                    ]
+
+        mode: string (optional)
+            Calculation type which is by default far-field `"far"` or can
+            be near-field `"near"`. Only far-field is up-to-date currently.
+
+        dtype: string (optional)
+            Numerical precision to be used. By default is "`double`", but
+            can be set to "`single`" (be careful with that though).
+
+        ctx: string (optional)
+            Define of openCL context. If not provided will provide this
+            choice interactively (or take default if only one is available).
+            Possible choices are:
+            'none': initialized without any device
+            'mpi': use platform `0` and map multiple avaliable devices vie MPI
+            list of choices for platform and device [PlatformID, DeviceID]
+
+        Features: list of strings (optional)
+            Additional features. Currently has following options:
+              'wavelengthGrid': make frequency axis with uniform wavelength intervals
+              'logGrid': make frequency axis with intervals growing logarithmically
+        """
 
         if mpi_installed:
             self.comm = MPI.COMM_WORLD
@@ -39,6 +87,53 @@ class SynchRad(Utilities):
                            comp='total', sigma_particle=0,
                            Np_max=None, nSnaps=1, it_range=None,
                            file_spectrum=None, verbose=True):
+        """
+        Main method to run the SR calculation.
+
+        Parameters
+        ----------
+        particleTracks: list
+            Container of the particles tracks. Each track has the format:
+            [x, y, z, uz, uy, uz, w, it_start], where first 6 are the
+            numpy arrays of coordinates and normalized momenta (`beta*gamma`),
+            `w` is a particle weight which defines a number of the real
+            particles, and `it_start` is an time step at which particle appears
+            relative to the whole interaction.
+
+        file_tracks: string
+            Path to the h5-file with tracks in a specific format, as created
+            by the available convertsion utilities (openPMD, VSIM)
+
+        timeStep: double
+            Step used in the tracks defined as `c*dt` and in the same units of
+            distance as the coordinates
+
+        comp: string (optional)
+            Define which vector components of emitted light to calculate.
+            Available choices are:
+              'total' (default): sum incoherently all components, e.g.
+                `SUM_tracks( |A_x|^2 + |A_y|^2 + |A_z|^2)`
+              'cartesian': record Cartesian components incoherently, e.g.
+                `SUM_tracks(|A_x|^2), SUM_tracks(|A_y|^2), SUM_tracks(|A_z|^2)`
+              'spheric': record spheric components incoherently, e.g.
+                `SUM_tracks(|A_r|^2), SUM_tracks(|A_theta|^2), SUM_tracks(|A_phi|^2)`
+              'cartesian_comples': record Cartesian components coherently, e.g.
+                `SUM_tracks(A_x), SUM_tracks(A_y), SUM_tracks(A_z)`
+        sigma_particle: double (optional)
+            Define size of the particle in distance units using Gaussian form factor
+        Np_max: integer
+            Define a number of tracks to use in calculation
+
+        nSnaps: integer (optional)
+            Number of records to make along the interaction time with uniform intervals
+
+        it_range:
+            Specify the range of iterations to consider along the interaction
+
+        file_spectrum: string
+            Path and name to the file to which write the radiation data along with
+            the simulation configuration
+        """
 
         self.Args['sigma_particle'] = self.dtype(sigma_particle)
         nSnaps = np.uint32(nSnaps)
