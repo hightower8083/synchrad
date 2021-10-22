@@ -34,21 +34,32 @@ class SynchRad(Utilities):
         Arguments available in `Args` dictionary
         ----------
         grid: list
-            List of parameters to construct a grid in the 3D shperical
-            coordinates `(omega, theta, phi)`, where frequency omega is
-            in the units of `2*pi*c/lambda_u` with `lambda_u` being unit
-            distance used for tracked corrdinates, and `theta` and `phi`
-            are the elevation and rotation angles in radians. Format:
+            List of parameters to construct a 3D grid. For the `far-field`
+            calculations grid defines the spherical coordinates
+            `(omega, theta, phi)`, where frequency omega is in the units of
+            `2*pi*c/lambda_u` with `lambda_u` being unit distance used for 
+            tracked corrdinates, and `theta` and `phi` are the elevation and
+            rotation angles in radians. For the `near-field` calculations,
+            elevation angle `theta` is replaced by the radius `R` in the units
+            of coordinates.
+            Format for the far-field:
             "grid": [
                       (omega_min, omega_max),
                       (theta_min, theta_max),
                       (phi_min, phi_max),
                       (N_omega, N_theta, N_phi),
                     ]
+            Format for the near-field:
+            "grid": [
+                      (omega_min, omega_max),
+                      (R_min, R_max),
+                      (phi_min, phi_max),
+                      (N_omega, N_R, N_phi),
+                    ]
 
         mode: string (optional)
             Calculation type which is by default far-field `"far"` or can
-            be near-field `"near"`. Only far-field is up-to-date currently.
+            be near-field `"near"`.
 
         dtype: string (optional)
             Numerical precision to be used. By default is "`double`", but
@@ -83,10 +94,12 @@ class SynchRad(Utilities):
         else:
             self._read_args(file_spectrum)
 
-    def calculate_spectrum(self, particleTracks=[], file_tracks=None, timeStep=None,
-                           comp='total', sigma_particle=0,
-                           Np_max=None, nSnaps=1, it_range=None,
-                           file_spectrum=None, verbose=True):
+    def calculate_spectrum(self, particleTracks=[], file_tracks=None,
+                           timeStep=None, comp='total', L_screen=None,
+                           Np_max=None, it_range=None,
+                           nSnaps=1, sigma_particle=0,
+                           file_spectrum=None,
+                           verbose=True):
         """
         Main method to run the SR calculation.
 
@@ -108,16 +121,20 @@ class SynchRad(Utilities):
             Step used in the tracks defined as `c*dt` and in the same units of
             distance as the coordinates
 
+        L_screen: double
+            For the near-field calculations, the distance to the screen should
+            be defined. Has the same units as the coordinates.
+
         comp: string (optional)
             Define which vector components of emitted light to calculate.
             Available choices are:
-              'total' (default): sum incoherently all components, e.g.
+              'total' (default): sum incoherently all components:
                 `SUM_tracks( |A_x|^2 + |A_y|^2 + |A_z|^2)`
-              'cartesian': record Cartesian components incoherently, e.g.
+              'cartesian': record Cartesian components incoherently:
                 `SUM_tracks(|A_x|^2), SUM_tracks(|A_y|^2), SUM_tracks(|A_z|^2)`
-              'spheric': record spheric components incoherently, e.g.
+              'spheric': record spheric components incoherently (far-field only):
                 `SUM_tracks(|A_r|^2), SUM_tracks(|A_theta|^2), SUM_tracks(|A_phi|^2)`
-              'cartesian_comples': record Cartesian components coherently, e.g.
+              'cartesian_complex': record Cartesian components coherently:
                 `SUM_tracks(A_x), SUM_tracks(A_y), SUM_tracks(A_z)`
 
         sigma_particle: double (optional)
@@ -138,6 +155,12 @@ class SynchRad(Utilities):
         """
 
         self.Args['sigma_particle'] = self.dtype(sigma_particle)
+        if self.Args['mode'] == 'near':
+            if L_screen is not None:
+                self.Args['L_screen'] = L_screen
+            else:
+                print('Define L_screen argument for near-field calculation')
+
         nSnaps = np.uint32(nSnaps)
         self._init_raditaion(comp, nSnaps)
 
@@ -261,7 +284,7 @@ class SynchRad(Utilities):
         args_axes = [self.Data[name].data for name in axs_str]
 
         if self.Args['mode'] is 'near':
-            args_axes += [ self.dtype(self.Args['grid'][3]), ]
+            args_axes += [ self.dtype(self.Args['L_screen']), ]
 
         args_res = [np.uint32(Nn) for Nn in self.Args['gridNodeNums']]
         args_aux = [self.Args['timeStep'], nSnaps, self.snap_iterations.data]
@@ -278,7 +301,8 @@ class SynchRad(Utilities):
         elif comp is 'cartesian_complex':
             arg_FormFactor = [self.Data['FormFactor'].data,]
             args += arg_FormFactor
-            self._mapper.cartesian_comps_complex(self.queue, (WGS_tot, ), (WGS, ),
+            self._mapper.cartesian_comps_complex( self.queue, (WGS_tot, ),
+                                                  (WGS, ),
             spect['xre'].data, spect['xim'].data,
             spect['yre'].data, spect['yim'].data,
             spect['zre'].data, spect['zim'].data,
@@ -363,7 +387,7 @@ class SynchRad(Utilities):
             self.Args['dV'] = self.Args['dw']*self.Args['dth']*self.Args['dph']
 
         elif self.Args['mode'] == 'near':
-            Nr, Np = gridNodeNums[1:]
+            Nr, Np = self.Args['gridNodeNums'][1:]
 
             r_min, r_max  = self.Args['grid'][1]
             phi_min, phi_max = self.Args['grid'][2]
@@ -391,7 +415,8 @@ class SynchRad(Utilities):
         radiation_shape = (nSnaps, ) + radiation_shape
 
         vec_comps = {'cartesian':['x', 'y', 'z'],
-                     'cartesian_complex':['xre', 'xim','yre', 'yim', 'zre', 'zim'],
+                     'cartesian_complex':['xre', 'xim','yre',
+                                          'yim', 'zre', 'zim'],
                      'spheric':['r', 'theta', 'phi'],
                      'total': ['total',]
                      }
@@ -399,9 +424,12 @@ class SynchRad(Utilities):
         self.Args['comp'] = comp
         self.Data['radiation'] = {}
 
-        omega_loc = self.dtype(2*np.pi) * self.Args['omega']
+        exp_factor = self.dtype(-0.5) * \
+            (self.dtype(2*np.pi) * self.Args['omega'] * \
+             self.Args['sigma_particle'])**2
+
         self.Data['FormFactor'] = arrcl.to_device( self.queue,
-            np.exp( self.dtype(-0.5) * (omega_loc*self.Args['sigma_particle'])**2 ) )
+                                                   np.exp( exp_factor ) )
 
         for vec_comp in vec_comps[comp]:
             self.Data['radiation'][vec_comp] = \
@@ -497,9 +525,8 @@ class SynchRad(Utilities):
     def _spectr_from_device(self, nSnaps):
         for key in self.Data['radiation'].keys():
             buff = self.Data['radiation'][key].get().swapaxes(-1,-3)
-            #if nSnaps == 1:
-            #    buff = buff[-1]
-            self.Data['radiation'][key] = np.ascontiguousarray(buff, dtype=np.double)
+            self.Data['radiation'][key] = np.ascontiguousarray(buff,
+                                            dtype=np.double)
 
     def _track_to_device(self, particleTrack):
         if len(particleTrack) == 8:

@@ -70,14 +70,16 @@ class Utilities:
           phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
         if self.Args['mode'] == 'far':
-            val = 0.5*self.Args['dth']*self.Args['dph']*( (val[1:] + val[:-1]) \
-              *np.sin(self.Args['theta'][None,:,None]) ).sum(-1).sum(-1)
-        elif self.Args['mode'] == 'near2D':
-            val = 0.5*self.Args['dx']*self.Args['dy'] \
-                  *(val[1:] + val[:-1]).sum(-1).sum(-1)
+            theta_loc = 0.5 * (self.Args['theta'][1:] + self.Args['theta'][:-1])
+            val_loc = 0.5 * (val[:,1:,:] + val[:,:-1,:])
+            int_theta = np.trapz( val_loc * np.sin(theta_loc)[None,:,None],
+                                  theta_loc, axis=1)
+            val = self.Args['dph'] * int_theta.sum(-1)
+
         elif self.Args['mode'] == 'near':
-            val = 0.5*self.Args['dr']*self.Args['dph']*( (val[1:] + val[:-1]) \
-              *self.Args['radius'][None,:,None] ).sum(-1).sum(-1)
+            r_loc = self.Args['radius']
+            int_r = np.trapz( val * r_loc[None,:,None], r_loc, axis=1)
+            val = self.Args['dph'] * int_r.sum(-1)
 
         return val
 
@@ -87,7 +89,7 @@ class Utilities:
         val = self.get_energy_spectrum(spect_filter=spect_filter, \
           phot_num=phot_num, lambda0_um=lambda0_um, **kw_args)
 
-        val = (val*self.Args['dw']).sum()
+        val = np.trapz(val, self.Args['omega'])
         return val
 
     def get_spot(self, k0=None, spect_filter=None, \
@@ -98,8 +100,12 @@ class Utilities:
 
         if k0 is None:
             if val.shape[0]>1:
-                val = 0.5*(val[1:] + val[:-1])
-            val = (val*self.Args['dw'][:, None, None]).sum(0)
+                val = np.trapz(val, self.Args['omega'], axis=0)
+            else:
+                val = val[0] * self.Args['dw']
+            #if val.shape[0]>1:
+            #    val = 0.5*(val[1:] + val[:-1])
+            #val = (val*self.Args['dw'][:, None, None]).sum(0)
         else:
             ax = self.Args['omega']
             indx = (ax<k0).sum()
@@ -137,6 +143,7 @@ class Utilities:
         return val, ext
 
     def get_spectral_axis(self):
+        """
         if 'Features' not in self.Args.keys():
             self.Args['Features'] = []
 
@@ -146,8 +153,8 @@ class Utilities:
                 ax = 0.5*(self.Args['wavelengths'][1:] \
                     + self.Args['wavelengths'][:-1])
                 break
-
-        return ax
+        """
+        return self.Args['omega']
 
     def exportToVTK( self, spect_filter=None, phot_num=False,\
                      lambda0_um = None, smooth_filter=None, \
