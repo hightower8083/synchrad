@@ -301,16 +301,26 @@ class SynchRad(Utilities):
         elif comp is 'cartesian_complex':
             arg_FormFactor = [self.Data['FormFactor'].data,]
             args += arg_FormFactor
-            self._mapper.cartesian_comps_complex( self.queue, (WGS_tot, ),
-                                                  (WGS, ),
-            spect['xre'].data, spect['xim'].data,
-            spect['yre'].data, spect['yim'].data,
-            spect['zre'].data, spect['zim'].data,
-            *args)
+            self._mapper.cartesian_comps_complex(
+                self.queue, (WGS_tot, ), (WGS, ),
+                spect['xre'].data, spect['xim'].data,
+                spect['yre'].data, spect['yim'].data,
+                spect['zre'].data, spect['zim'].data,
+                *args)
 
         elif comp is 'spheric':
             self._mapper.spheric_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['r'].data, spect['theta'].data, spect['phi'].data, *args)
+
+        elif comp is 'spheric_complex':
+            arg_FormFactor = [self.Data['FormFactor'].data,]
+            args += arg_FormFactor
+            self._mapper.spheric_comps_complex(
+                self.queue, (WGS_tot, ), (WGS, ),
+                spect['rre'].data, spect['rim'].data,
+                spect['thetare'].data, spect['thetaim'].data,
+                spect['phire'].data, spect['phiim'].data,
+                *args)
 
     def _init_args(self, Args):
         self.Args = Args
@@ -418,6 +428,8 @@ class SynchRad(Utilities):
                      'cartesian_complex':['xre', 'xim','yre',
                                           'yim', 'zre', 'zim'],
                      'spheric':['r', 'theta', 'phi'],
+                     'spheric_complex':['rre', 'rim','thetare',
+                                        'thetaim', 'phire', 'phiim'],
                      'total': ['total',]
                      }
 

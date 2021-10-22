@@ -31,16 +31,22 @@ class Utilities:
         if self.Args['comp'].split('_')[-1] == 'complex':
             if comp=='total':
                 for key in keys:
-                    val += self.Data['radiation'][key][iteration].astype(np.double)**2
+                    val += self.Data['radiation'][key][iteration]\
+                        .astype(np.double)**2
             else:
-                val += np.abs( self.Data['radiation'][comp+'re'][iteration].astype(np.double) \
-                    + 1j * self.Data['radiation'][comp+'im'][iteration].astype(np.double))
+                val += \
+                    np.abs( self.Data['radiation'][comp+'re'][iteration]\
+                        .astype(np.double) \
+                    + 1j * self.Data['radiation'][comp+'im'][iteration]\
+                        .astype(np.double))
         else:
             if comp=='total':
                 for key in keys:
-                    val += self.Data['radiation'][key][iteration].astype(np.double)
+                    val += self.Data['radiation'][key][iteration]\
+                        .astype(np.double)
             else:
-                val += self.Data['radiation'][comp][iteration].astype(np.double)
+                val += self.Data['radiation'][comp][iteration]\
+                    .astype(np.double)
 
         if self.Args['mode'] == 'far':
             val = alpha_fs / (4 * np.pi**2) * val
