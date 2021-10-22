@@ -14,7 +14,7 @@ __kernel void cartesian_comps(
   __global ${my_dtype} *uz,
            ${my_dtype} wp,
                   uint itStart,
-                  uint itEnd,                    
+                  uint itEnd,
                   uint nSteps,
   __global ${my_dtype} *omega,
   __global ${my_dtype} *radius,
@@ -63,37 +63,26 @@ __kernel void cartesian_comps(
       it_glob = itStart + it;
 
       if (it<nSteps-1)
-      { 
+      {
         time = (${my_dtype})it * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
-          
-        rVec = coordOnScreen - xLocal;               // will reuse the name
-        rLocal = ${f_native}sqrt( dot(rVec, rVec) );        
+
+        rVec = coordOnScreen - xLocal;
+        rLocal = ${f_native}sqrt( dot(rVec, rVec) );
 
         phase = omegaLocal * (time + rLocal) ;
         dPhase = fabs(phase - phasePrev);
         phasePrev = phase;
-        
-        if ( dPhase < (${my_dtype})M_PI ) 
+
+        if ( dPhase < (${my_dtype})M_PI )
         {
           rInv = (${my_dtype})1. / rLocal;
           nVec = rInv * rVec;
-            
+
           uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
-          uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
-
-          /*
           gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
           uLocal *= gammaInv;
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
-          uNextLocal *= gammaInv;
-          uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
-          */
 
-          uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
-          uLocal *= gammaInv;
-            
           sinPhase = ${f_native}sin(phase);
           cosPhase = ${f_native}cos(phase);
 
@@ -104,7 +93,7 @@ __kernel void cartesian_comps(
           spectrLocalIm +=  c1*cosPhase + c2*sinPhase;
         }
       }
-        
+
       if (it_glob+2 == itSnaps[iSnap])
       {
         spectrum1[gti + nTotal*iSnap] +=  wpdt2 *
@@ -139,7 +128,7 @@ __kernel void cartesian_comps_complex(
   __global ${my_dtype} *uz,
            ${my_dtype} wp,
                   uint itStart,
-                  uint itEnd,                    
+                  uint itEnd,
                   uint nSteps,
   __global ${my_dtype} *omega,
   __global ${my_dtype} *radius,
@@ -189,37 +178,26 @@ __kernel void cartesian_comps_complex(
       it_glob = itStart + it;
 
       if (it<nSteps-1)
-      { 
+      {
         time = (${my_dtype})it * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
-          
-        rVec = coordOnScreen - xLocal;               // will reuse the name
-        rLocal = ${f_native}sqrt( dot(rVec, rVec) );        
+
+        rVec = coordOnScreen - xLocal;
+        rLocal = ${f_native}sqrt( dot(rVec, rVec) );
 
         phase = omegaLocal * (time + rLocal) ;
         dPhase = fabs(phase - phasePrev);
         phasePrev = phase;
-        
-        if ( dPhase < (${my_dtype})M_PI ) 
+
+        if ( dPhase < (${my_dtype})M_PI )
         {
           rInv = (${my_dtype})1. / rLocal;
           nVec = rInv * rVec;
-            
+
           uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
-          uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
-
-          /*
           gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
           uLocal *= gammaInv;
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
-          uNextLocal *= gammaInv;
-          uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
-          */
 
-          uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
-          uLocal *= gammaInv;
-            
           sinPhase = ${f_native}sin(phase);
           cosPhase = ${f_native}cos(phase);
 
@@ -230,7 +208,7 @@ __kernel void cartesian_comps_complex(
           spectrLocalIm +=  c1*cosPhase + c2*sinPhase;
         }
       }
-        
+
       if (it_glob+2 == itSnaps[iSnap])
       {
         spectrum1_re[gti + nTotal*iSnap] += wpdt * spectrLocalRe.s0;
@@ -248,7 +226,6 @@ __kernel void cartesian_comps_complex(
   }
 }
 
-
 __kernel void total(
   __global ${my_dtype} *spectrum,
   __global ${my_dtype} *x,
@@ -259,7 +236,7 @@ __kernel void total(
   __global ${my_dtype} *uz,
            ${my_dtype} wp,
                   uint itStart,
-                  uint itEnd,                    
+                  uint itEnd,
                   uint nSteps,
   __global ${my_dtype} *omega,
   __global ${my_dtype} *radius,
@@ -288,7 +265,7 @@ __kernel void total(
                                                   radius[iRadius]*sinPhi[iPhi],
                                                   distanceToScreen };
 
-    ${my_dtype}3 xLocal, uLocal, uNextLocal, rVec, nVec, c1, c2;
+    ${my_dtype}3 xLocal, uLocal, rVec, nVec, c1, c2;
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, rLocal, rInv, gammaInv;
 
     ${my_dtype} dtInv = (${my_dtype})1. / dt;
@@ -308,37 +285,27 @@ __kernel void total(
       it_glob = itStart + it;
 
       if (it<nSteps-1)
-      { 
+      {
         time = (${my_dtype})it * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
-          
-        rVec = coordOnScreen - xLocal;               // will reuse the name
-        rLocal = ${f_native}sqrt( dot(rVec, rVec) );        
+
+        rVec = coordOnScreen - xLocal;
+        rLocal = ${f_native}sqrt( dot(rVec, rVec) );
 
         phase = omegaLocal * (time + rLocal) ;
         dPhase = fabs(phase - phasePrev);
         phasePrev = phase;
-        
-        if ( dPhase < (${my_dtype})M_PI ) 
+
+        if ( dPhase < (${my_dtype})M_PI )
         {
           rInv = (${my_dtype})1. / rLocal;
           nVec = rInv * rVec;
-            
+
           uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
-          uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
 
-          /*
           gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
           uLocal *= gammaInv;
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uNextLocal, uNextLocal) );
-          uNextLocal *= gammaInv;
-          uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
-          */
 
-          uLocal = (${my_dtype})0.5 * (uNextLocal + uLocal);
-          gammaInv = ${f_native}rsqrt( (${my_dtype})1. + dot(uLocal, uLocal) );
-          uLocal *= gammaInv;
-            
           sinPhase = ${f_native}sin(phase);
           cosPhase = ${f_native}cos(phase);
 
@@ -349,7 +316,7 @@ __kernel void total(
           spectrLocalIm +=  c1*cosPhase + c2*sinPhase;
         }
       }
-        
+
       if (it_glob+2 == itSnaps[iSnap])
       {
         spectrum[gti + nTotal*iSnap] +=  wpdt2 * (
