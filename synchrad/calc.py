@@ -338,7 +338,7 @@ class SynchRad(Utilities):
             self.dtype = np.single
 
         if 'nOmegaChunk' not in self.Args:
-            self.Args['nOmegaChunk'] = 8
+            self.Args['nOmegaChunk'] = 1
 
         if self.Args['dtype'] is 'float':
             if self.Args['mode'] is 'far':
@@ -582,10 +582,7 @@ class SynchRad(Utilities):
         else:
             agrs['f_native'] = ''
 
-        if 'nOmegaChunk' in self.Args:
-            agrs['nOmegaChunk'] = int(self.Args['nOmegaChunk'])
-        else:
-            agrs['nOmegaChunk'] = 1
+        agrs['nOmegaChunk'] = self.Args['nOmegaChunk']
 
         fname = src_path
         if self.Args['mode'] is 'far':
