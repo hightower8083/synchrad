@@ -27,44 +27,27 @@ __kernel void total(
   __global        uint *itSnaps)
 {
   uint gti = (uint) get_global_id(0);
-  uint nOmegaChunk = nOmega / (uint ${nOmegaChunk});
-  uint nTotalChunk = nTheta*nPhi*nOmegaChunk;
-  uint nTotal = nTotalChunk * (uint ${nOmegaChunk});
+  uint nTotal = nTheta*nPhi*nOmega;
 
-  if (gti < nTotalChunk)
+  if (gti < nTotal)
   {
-    uint iPhi = gti / (nOmegaChunk * nTheta);
-    uint iTheta = (gti - iPhi*nOmegaChunk*nTheta) / nOmegaChunk;
-    uint iOmegaChunk = gti - iPhi*nOmegaChunk*nTheta - iTheta*nOmegaChunk;
-    uint iOmega = iOmegaChunk * (uint ${nOmegaChunk})
-    uint gtiGlobal = iOmega + iPhi*nOmega*nTheta + iTheta*nOmega;
+    uint iPhi = gti / (nOmega * nTheta);
+    uint iTheta = (gti - iPhi*nOmega*nTheta) / nOmega;
+    uint iOmega = gti - iPhi*nOmega*nTheta - iTheta*nOmega;
 
+    ${my_dtype} omegaLocal = omega[iOmega];
     ${my_dtype}3 nVec = (${my_dtype}3) { sinTheta[iTheta]*cosPhi[iPhi],
                                          sinTheta[iTheta]*sinPhi[iPhi],
                                          cosTheta[iTheta] };
 
     ${my_dtype}3 xLocal, uLocal, uNextLocal, aLocal, amplitude;
-    ${my_dtype} time, time_ret, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
+    ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
 
-    ${my_dtype}  dtInv = (${my_dtype})1. / dt;
-    ${my_dtype}  wpdt2 =  wp * dt * dt;
-
-    ${my_dtype} omegaChunk[${nOmegaChunk}];
-    ${my_dtype} phase[${nOmegaChunk}];
-    ${my_dtype} phasePrev[${nOmegaChunk}];
-    ${my_dtype}3 spectrLocalRe[${nOmegaChunk}];
-    ${my_dtype}3 spectrLocalIm[${nOmegaChunk}];
-
-    bool HasGoodCells;
-    bool phaseGood[${nOmegaChunk}];
-
-    for (uint iCh=0; iCh < ${nOmegaChunk}; iCh++) {
-      omegaChunk[iCh] = omega[iOmega+iCh];
-      phasePrev[iCh] = 0.0;
-      spectrLocalIm[iCh] = (${my_dtype}3) {0., 0., 0.};
-      spectrLocalRe[iCh] = (${my_dtype}3) {0., 0., 0.};
-      phaseGood[iCh] = false;
-    }
+    ${my_dtype} dtInv = (${my_dtype})1. / dt;
+    ${my_dtype} wpdt2 =  wp * dt * dt;
+    ${my_dtype} phasePrev = (${my_dtype}) 0.;
+    ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
+    ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
 
     uint iSnap, it_glob;
     for (iSnap=0; iSnap<nSnaps; iSnap++)
@@ -80,21 +63,12 @@ __kernel void total(
       {
         time = (${my_dtype})it * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
-        time_ret = time - dot(xLocal, nVec);
 
-        for (uint iCh=0; iCh<${nOmegaChunk}; iCh++)
-        {
-          phase[iCh] = omegaChunk[iCh] * time_ret;
-          phaseGood[iCh] = (fabs(phase[iCh]-phasePrev[iCh])<(${my_dtype})M_PI);
-          phasePrev[iCh] = phase[iCh];
+        phase = omegaLocal * (time - dot(xLocal, nVec)) ;
+        dPhase = fabs(phase - phasePrev);
+        phasePrev = phase;
 
-          if (phaseGood[iCh])
-          {
-            HasGoodCells = true;
-          }
-        }
-
-        if (HasGoodCells)
+        if (dPhase < (${my_dtype})M_PI)
         {
           uLocal = (${my_dtype}3) {ux[it], uy[it], uz[it]};
           uNextLocal = (${my_dtype}3) {ux[it+1], uy[it+1], uz[it+1]};
@@ -112,30 +86,21 @@ __kernel void total(
 
           c2 =  (${my_dtype})1. / c2;
           c1 = c1*c2*c2;
+
+          sinPhase = ${f_native}sin(phase);
+          cosPhase = ${f_native}cos(phase);
+
           amplitude = c1*(nVec - uLocal) - c2*aLocal;
-
-          for (uint iCh=0; iCh<${nOmegaChunk}; iCh++)
-          {
-            if (phaseGood[iCh])
-            {
-              sinPhase = ${f_native}sin(phase[iCh]);
-              cosPhase = ${f_native}cos(phase[iCh]);
-
-              spectrLocalRe[iCh] += amplitude * cosPhase;
-              spectrLocalIm[iCh] += amplitude * sinPhase;
-            }
-          }
+          spectrLocalRe += amplitude * cosPhase;
+          spectrLocalIm += amplitude * sinPhase;
         }
       }
 
       if (it_glob+2 == itSnaps[iSnap])
       {
-        for (uint iCh=0; iCh<${nOmegaChunk}; iCh++)
-        {
-          spectrum[gtiGlobal + iCh + nTotal*iSnap] +=  wpdt2 * (
-            dot(spectrLocalRe[iCh], spectrLocalRe[iCh]) +
-            dot(spectrLocalIm[iCh], spectrLocalIm[iCh]) );
-        }
+        spectrum[gti + nTotal*iSnap] +=  wpdt2 * (
+          dot(spectrLocalRe, spectrLocalRe) +
+          dot(spectrLocalIm, spectrLocalIm) );
         iSnap += 1;
       }
     }
