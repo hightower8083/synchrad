@@ -27,16 +27,16 @@ __kernel void total(
   __global        uint *itSnaps)
 {
   uint gti = (uint) get_global_id(0);
-  uint nOmegaChunk = nOmega / (uint ${nOmegaChunk});
-  uint nTotalChunk = nTheta*nPhi*nOmegaChunk;
-  uint nTotal = nTotalChunk * (uint ${nOmegaChunk});
+  uint nOmegaChunk = nOmega / ${nChunk};
+  uint nTotalChunk = nTheta * nPhi * nOmegaChunk;
+  uint nTotal = nTotalChunk *  ${nChunk};
 
   if (gti < nTotalChunk)
   {
     uint iPhi = gti / (nOmegaChunk * nTheta);
     uint iTheta = (gti - iPhi*nOmegaChunk*nTheta) / nOmegaChunk;
     uint iOmegaChunk = gti - iPhi*nOmegaChunk*nTheta - iTheta*nOmegaChunk;
-    uint iOmega = iOmegaChunk * (uint ${nOmegaChunk})
+    uint iOmega = iOmegaChunk * ${nChunk};
     uint gtiGlobal = iOmega + iPhi*nOmega*nTheta + iTheta*nOmega;
 
     ${my_dtype}3 nVec = (${my_dtype}3) { sinTheta[iTheta]*cosPhi[iPhi],
@@ -44,21 +44,21 @@ __kernel void total(
                                          cosTheta[iTheta] };
 
     ${my_dtype}3 xLocal, uLocal, uNextLocal, aLocal, amplitude;
-    ${my_dtype} time, time_ret, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
+    ${my_dtype} time, time_ret, sinPhase, cosPhase, c1, c2, gammaInv;
 
     ${my_dtype}  dtInv = (${my_dtype})1. / dt;
     ${my_dtype}  wpdt2 =  wp * dt * dt;
 
-    ${my_dtype} omegaChunk[${nOmegaChunk}];
-    ${my_dtype} phase[${nOmegaChunk}];
-    ${my_dtype} phasePrev[${nOmegaChunk}];
-    ${my_dtype}3 spectrLocalRe[${nOmegaChunk}];
-    ${my_dtype}3 spectrLocalIm[${nOmegaChunk}];
+    ${my_dtype} omegaChunk[${nChunk}];
+    ${my_dtype} phase[${nChunk}];
+    ${my_dtype} phasePrev[${nChunk}];
+    ${my_dtype}3 spectrLocalRe[${nChunk}];
+    ${my_dtype}3 spectrLocalIm[${nChunk}];
 
     bool HasGoodCells;
-    bool phaseGood[${nOmegaChunk}];
+    bool phaseGood[${nChunk}];
 
-    for (uint iCh=0; iCh < ${nOmegaChunk}; iCh++) {
+    for (uint iCh=0; iCh < ${nChunk}; iCh++) {
       omegaChunk[iCh] = omega[iOmega+iCh];
       phasePrev[iCh] = 0.0;
       spectrLocalIm[iCh] = (${my_dtype}3) {0., 0., 0.};
@@ -82,7 +82,7 @@ __kernel void total(
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
         time_ret = time - dot(xLocal, nVec);
 
-        for (uint iCh=0; iCh<${nOmegaChunk}; iCh++)
+        for (uint iCh=0; iCh<${nChunk}; iCh++)
         {
           phase[iCh] = omegaChunk[iCh] * time_ret;
           phaseGood[iCh] = (fabs(phase[iCh]-phasePrev[iCh])<(${my_dtype})M_PI);
@@ -114,7 +114,7 @@ __kernel void total(
           c1 = c1*c2*c2;
           amplitude = c1*(nVec - uLocal) - c2*aLocal;
 
-          for (uint iCh=0; iCh<${nOmegaChunk}; iCh++)
+          for (uint iCh=0; iCh<${nChunk}; iCh++)
           {
             if (phaseGood[iCh])
             {
@@ -130,7 +130,7 @@ __kernel void total(
 
       if (it_glob+2 == itSnaps[iSnap])
       {
-        for (uint iCh=0; iCh<${nOmegaChunk}; iCh++)
+        for (uint iCh=0; iCh<${nChunk}; iCh++)
         {
           spectrum[gtiGlobal + iCh + nTotal*iSnap] +=  wpdt2 * (
             dot(spectrLocalRe[iCh], spectrLocalRe[iCh]) +

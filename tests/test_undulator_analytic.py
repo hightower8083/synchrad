@@ -58,6 +58,7 @@ calc_input = {
         (0.0, 2 * np.pi),             # Rotation (phi) angle
         (128, 32, 32),                # Corresponding resolutions
     ],
+    'nChunk':4,
     # 'ctx':'mpi',                    # OpenCL context (leave commented to be asked)
 }
 

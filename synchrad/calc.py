@@ -272,7 +272,7 @@ class SynchRad(Utilities):
 
         spect = self.Data['radiation']
         WGS, WGS_tot = self._get_wgs(self.Args['numGridNodes'] \
-                                     / self.Args['nOmegaChunk'])
+                                     / self.Args['nChunk'])
 
         args_track = [coord.data for coord in (x, y, z, ux, uy, uz)]
         args_track += [wp, it_start, np.uint32(it_range[-1]), np.uint32(x.size)]
@@ -337,8 +337,8 @@ class SynchRad(Utilities):
         elif self.Args['dtype'] is 'float':
             self.dtype = np.single
 
-        if 'nOmegaChunk' not in self.Args:
-            self.Args['nOmegaChunk'] = 1
+        if 'nChunk' not in self.Args:
+            self.Args['nChunk'] = 1
 
         if self.Args['dtype'] is 'float':
             if self.Args['mode'] is 'far':
@@ -582,7 +582,7 @@ class SynchRad(Utilities):
         else:
             agrs['f_native'] = ''
 
-        agrs['nOmegaChunk'] = self.Args['nOmegaChunk']
+        agrs['nChunk'] = self.Args['nChunk']
 
         fname = src_path
         if self.Args['mode'] is 'far':
