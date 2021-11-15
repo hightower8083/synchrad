@@ -3,3 +3,4 @@ scipy
 mako
 pyopencl
 h5py
+tqdm

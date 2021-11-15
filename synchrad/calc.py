@@ -4,6 +4,7 @@ import pyopencl as cl
 import pyopencl.array as arrcl
 from mako.template import Template
 
+from tqdm import tqdm
 from .utils import Utilities
 from synchrad import __path__ as src_path
 
@@ -224,17 +225,25 @@ class SynchRad(Utilities):
             particleTracks = particleTracks[:Np][self.rank::self.size]
 
         # process the tracks
-        itr = 0
         self.total_weight = 0.0
-        for track in particleTracks:
+
+        if self.rank==0:
+            calc_iterator = tqdm(range(len(particleTracks)))
+        else:
+            calc_iterator = range(len(particleTracks))
+
+        for itr in calc_iterator:
+            track = particleTracks[itr]
             self.total_weight += track[6]
             track = self._track_to_device(track)
             self._process_track(track, comp, nSnaps, it_range)
+            """
             itr += 1
             if self.rank==0 and verbose:
                 progress = itr/len(particleTracks) * 100
                 print("Done {:0.1f}%".format(progress),
                       end='\r', flush=True)
+            """
 
         # receive and gather tracks from devices
         self._spectr_from_device(nSnaps)
