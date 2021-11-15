@@ -13,8 +13,9 @@ except (ImportError,):
     tvtk_installed = False
 
 J_in_um = 2e6*np.pi*hbar*c
-omega_1m = (2 * np.pi * c)
 r_e = e**2 / ( 4 * np.pi * epsilon_0 * m_e * c**2)
+omega_1m = (2 * np.pi * c)
+energy_1m_eV = omega_1m * hbar / e
 
 class Utilities:
 
