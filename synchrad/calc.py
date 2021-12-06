@@ -631,5 +631,9 @@ class SynchRad(Utilities):
                 for key in f['Args'].keys():
                     self.Args[key] = f['Args/'+key][()]
 
+                    # in h5py >=3.0, the strings in datasets are bytes!
+                    if isinstance(self.Args[key], bytes):
+                        self.Args[key] = self.Args[key].decode()
+
                 self.snap_iterations = f['snap_iterations'][()]
                 self.total_weight = f['total_weight'][()]
