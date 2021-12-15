@@ -35,11 +35,12 @@ class Utilities:
                     val += self.Data['radiation'][key][iteration]\
                         .astype(np.double)**2
             else:
-                val += \
-                    np.abs( self.Data['radiation'][comp+'re'][iteration]\
-                        .astype(np.double) \
-                    + 1j * self.Data['radiation'][comp+'im'][iteration]\
-                        .astype(np.double))
+                val = \
+                    self.Data['radiation'][comp+'re'][iteration]\
+                        .astype(np.complex128) \
+                    + 1.0j * self.Data['radiation'][comp+'im'][iteration]\
+                        .astype(np.complex128)
+                #print(val.dtype)
         else:
             if comp=='total':
                 for key in keys:

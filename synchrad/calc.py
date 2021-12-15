@@ -237,13 +237,6 @@ class SynchRad(Utilities):
             self.total_weight += track[6]
             track = self._track_to_device(track)
             self._process_track(track, comp, nSnaps, it_range)
-            """
-            itr += 1
-            if self.rank==0 and verbose:
-                progress = itr/len(particleTracks) * 100
-                print("Done {:0.1f}%".format(progress),
-                      end='\r', flush=True)
-            """
 
         # receive and gather tracks from devices
         self._spectr_from_device(nSnaps)
