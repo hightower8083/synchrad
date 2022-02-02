@@ -436,6 +436,11 @@ class SynchRad(Utilities):
                      }
 
         self.Args['comp'] = comp
+
+        if self.Args['mode'] == 'near':
+            self.Args['theta']  = np.arctan2( self.Args['radius'],
+                                              self.Args['L_screen'] )
+
         self.Data['radiation'] = {}
 
         exp_factor = self.dtype(-0.5) * \
