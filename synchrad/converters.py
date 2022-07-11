@@ -27,6 +27,8 @@ def tracksFromOPMD(ts, pt, ref_iteration,
         else:
             print(f"Selected sampling method '{sample_selection}' is ",
                    "not available.")
+    else:
+        selected_pid = all_pid
 
     if dNp>1:
         selected_pid = selected_pid[::dNp]
