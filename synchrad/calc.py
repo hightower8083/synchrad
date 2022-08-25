@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import pyopencl as cl
+cl.create_some_context()
 import pyopencl.array as arrcl
 from mako.template import Template
 

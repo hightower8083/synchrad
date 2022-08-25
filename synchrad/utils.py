@@ -1,4 +1,5 @@
 import numpy as np
+import h5py
 from scipy.constants import m_e, c, e, epsilon_0, hbar
 from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
@@ -212,3 +213,54 @@ class Utilities:
         spc_vtk.point_data.scalars = val.flatten()
         spc_vtk.point_data.scalars.name = scalar_name
         write_data(spc_vtk, filename)
+
+
+def read_tracks(filename, N_particles=None, dt_step=1):
+
+    with h5py.File(filename, mode='r') as fl:
+        dt = fl['misc/cdt'][()] * dt_step / c
+
+        if N_particles is None:
+            N_particles = fl['misc/N_particles'][()]
+
+        Nmax_min = np.inf
+        for ip in range(N_particles):
+            Nmax_loc = fl[f'tracks/{ip}/x'][()].size
+            if Nmax_min >= Nmax_loc:
+                Nmax_min = Nmax_loc
+
+        x =  np.ascontiguousarray([ fl[f'tracks/{ip}/x' ][()][:Nmax_min] for ip in range(N_particles) ])[:, ::dt_step]
+        y =  np.ascontiguousarray([ fl[f'tracks/{ip}/y' ][()][:Nmax_min] for ip in range(N_particles) ])[:, ::dt_step]
+        z =  np.ascontiguousarray([ fl[f'tracks/{ip}/z' ][()][:Nmax_min] for ip in range(N_particles) ])[:, ::dt_step]
+        ux = np.ascontiguousarray([ fl[f'tracks/{ip}/ux'][()][:Nmax_min] for ip in range(N_particles) ])[:, ::dt_step]
+        uy = np.ascontiguousarray([ fl[f'tracks/{ip}/uy'][()][:Nmax_min] for ip in range(N_particles) ])[:, ::dt_step]
+        uz = np.ascontiguousarray([ fl[f'tracks/{ip}/uz'][()][:Nmax_min] for ip in range(N_particles) ])[:, ::dt_step]
+        w =  np.ascontiguousarray([ fl[f'tracks/{ip}/w' ][()] for ip in range(N_particles) ])
+
+    return x, y, z, ux, uy, uz, w, dt
+
+def get_Larmor(x, y, z, ux, uy, uz, dt):
+
+    gamma_p = np.sqrt(1.0 + ux**2 + uy**2 + uz**2)
+
+    bx = ux/gamma_p
+    by = uy/gamma_p
+    bz = uz/gamma_p
+
+    dt_bx = np.gradient(bx, dt, axis=-1)
+    dt_by = np.gradient(by, dt, axis=-1)
+    dt_bz = np.gradient(bz, dt, axis=-1)
+
+    e_cgs = 4.8032047e-10
+    с_cgs = c * 1e2
+
+    Power_Larmor = 2 * e_cgs**2 / 3 / с_cgs * gamma_p**6 * (
+         dt_bx**2 + dt_by**2 + dt_bz**2 - \
+         ( by*dt_bz - bz*dt_by )**2 - \
+         ( bz*dt_bx - bx*dt_bz )**2 - \
+         ( bx*dt_by - by*dt_bx )**2
+        )
+
+    Power_Larmor *= 1e-7
+
+    return Power_Larmor
