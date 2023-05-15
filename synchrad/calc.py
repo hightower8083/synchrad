@@ -99,7 +99,7 @@ class SynchRad(Utilities):
     def calculate_spectrum(self, particleTracks=[], file_tracks=None,
                            timeStep=None, comp='total', L_screen=None,
                            Np_max=None, it_range=None,
-                           nSnaps=1, sigma_particle=0,
+                           nSnaps=1, sigma_particle=0, weights_to_unity=False,
                            file_spectrum=None,
                            verbose=True):
         """
@@ -235,6 +235,8 @@ class SynchRad(Utilities):
 
         for itr in calc_iterator:
             track = particleTracks[itr]
+            if weights_to_unity:
+                track[6] = 1.0
             self.total_weight += track[6]
             track = self._track_to_device(track)
             self._process_track(track, comp, nSnaps, it_range)

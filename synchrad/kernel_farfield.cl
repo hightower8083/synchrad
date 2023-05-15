@@ -273,7 +273,7 @@ __kernel void cartesian_comps_complex(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
 
     ${my_dtype} dtInv = (${my_dtype})1. / dt;
-    ${my_dtype} wpdt = ${f_native}sqrt(wp) * dt;
+    ${my_dtype} wpdt = wp * dt;
     ${my_dtype} phasePrev = (${my_dtype}) 0.;
     ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
     ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
@@ -520,7 +520,7 @@ __kernel void spheric_comps_complex(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
 
     ${my_dtype} dtInv = (${my_dtype})1. / dt;
-    ${my_dtype} wpdt =  ${f_native}sqrt(wp) * dt;
+    ${my_dtype} wpdt =  wp * dt;
     ${my_dtype} phasePrev = (${my_dtype}) 0.;
     ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
     ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
