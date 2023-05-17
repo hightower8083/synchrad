@@ -77,8 +77,10 @@ class SynchRad(Utilities):
 
         Features: list of strings (optional)
             Additional features. Currently has following options:
-              'wavelengthGrid': make frequency axis with uniform wavelength intervals
-              'logGrid': make frequency axis with intervals growing logarithmically
+              'wavelengthGrid': make frequency axis with uniform 
+                wavelength intervals 
+              'logGrid': make frequency axis with intervals growing 
+                logarithmically
         """
 
         if mpi_installed:
@@ -99,7 +101,8 @@ class SynchRad(Utilities):
     def calculate_spectrum(self, particleTracks=[], file_tracks=None,
                            timeStep=None, comp='total', L_screen=None,
                            Np_max=None, it_range=None,
-                           nSnaps=1, sigma_particle=0, weights_to_unity=False,
+                           nSnaps=1, sigma_particle=0,
+                           weights_normalize=None,
                            file_spectrum=None,
                            verbose=True):
         """
@@ -134,26 +137,32 @@ class SynchRad(Utilities):
                 `SUM_tracks( |A_x|^2 + |A_y|^2 + |A_z|^2)`
               'cartesian': record Cartesian components incoherently:
                 `SUM_tracks(|A_x|^2), SUM_tracks(|A_y|^2), SUM_tracks(|A_z|^2)`
-              'spheric': record spheric components incoherently (far-field only):
-                `SUM_tracks(|A_r|^2), SUM_tracks(|A_theta|^2), SUM_tracks(|A_phi|^2)`
+              'spheric': record spheric components incoherently 
+                (far-field only): `SUM_tracks(|A_r|^2), 
+                SUM_tracks(|A_theta|^2), SUM_tracks(|A_phi|^2)`
               'cartesian_complex': record Cartesian components coherently:
                 `SUM_tracks(A_x), SUM_tracks(A_y), SUM_tracks(A_z)`
 
-        sigma_particle: double (optional)
-            Define size of the particle in distance units using Gaussian form factor
+        sigma_particle : double (optional) Define size of the particle 
+            in distance units using Gaussian form factor
 
-        Np_max: integer
+        weights_normalize : string or None (optional) Reset the particle 
+            weights with some normalization (needed for coherency 
+            effects with macroparticles). Can be 'mean', 'max' or 'ones' 
+            to normalize weights with a mean or max weight (over all 
+            tracks) or set them to ones respectively.
+
+        Np_max : integer
             Define a number of tracks to use in calculation
 
-        nSnaps: integer (optional)
-            Number of records to make along the interaction time with uniform intervals
+        nSnaps : integer (optional) Number of records to make along the 
+            interaction time with uniform intervals
 
-        it_range:
+        it_range :
             Specify the range of iterations to consider along the interaction
 
-        file_spectrum: string
-            Path and name to the file to which write the radiation data along with
-            the simulation configuration
+        file_spectrum : string Path and name to the file to which write 
+            the radiation data along with the simulation configuration
         """
 
         self.Args['sigma_particle'] = self.dtype(sigma_particle)
@@ -200,10 +209,10 @@ class SynchRad(Utilities):
             particleTracks = []
             cmps = ('x', 'y', 'z', 'ux', 'uy', 'uz', 'w', 'it_start')
             part_ind = np.arange(Np)[self.rank::self.size]
+
             for ip in part_ind:
                 track = [f_tracks[f"tracks/{ip:d}/{cmp}"][()] for cmp in cmps]
                 particleTracks.append(track)
-
             if self.rank==0 and verbose:
                 print("Tracks are loaded")
             f_tracks.close()
@@ -228,6 +237,17 @@ class SynchRad(Utilities):
         # process the tracks
         self.total_weight = 0.0
 
+        if weights_normalize=='mean' or weights_normalize=='max':
+            weights = []
+
+            for track in particleTracks:
+                weights.append(track[6])
+
+            if weights_normalize=='mean':
+                weight_norm = np.mean(weights)
+            elif weights_normalize=='max':
+                weight_norm = np.max(weights)
+
         if self.rank==0:
             calc_iterator = tqdm(range(len(particleTracks)))
         else:
@@ -235,8 +255,12 @@ class SynchRad(Utilities):
 
         for itr in calc_iterator:
             track = particleTracks[itr]
-            if weights_to_unity:
+
+            if weights_normalize=='mean' or weights_normalize=='max':
+                track[6] /= weight_norm
+            elif weights_normalize=='ones':
                 track[6] = 1.0
+
             self.total_weight += track[6]
             track = self._track_to_device(track)
             self._process_track(track, comp, nSnaps, it_range)
@@ -364,12 +388,13 @@ class SynchRad(Utilities):
         omega = np.r_[omega_min:omega_max:No*1j]
         for feature in self.Args['Features']:
             if feature == 'wavelengthGrid':
-                self.Args['wavelengths'] = np.r_[1./omega_max:1./omega_min:No*1j]
+                self.Args['wavelengths'] = np.r_[
+                    1. / omega_max : 1. / omega_min : No * 1j ]
                 omega = 1./self.Args['wavelengths']
                 break
             elif feature == 'logGrid':
-                d_log_w = np.log(omega_max/omega_min) / (No-1.0)
-                omega = omega_min * np.exp( d_log_w*np.arange(No)  )
+                d_log_w = np.log(omega_max / omega_min) / (No - 1.0)
+                omega = omega_min * np.exp( d_log_w * np.arange(No) )
                 break
 
         self.Args['omega'] = omega.astype(self.dtype)
