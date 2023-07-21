@@ -1,8 +1,20 @@
 import numpy as np
 from scipy.constants import c
 import h5py
-from numba import njit, jit
+import warnings
 
+# try import numba and make dummy methods if cannot
+try:
+    from numba import njit, prange
+    njit = njit(parallel=True)
+except Exception:
+    prange = range
+    def njit(func):
+        def func_wrp(*args, **kw_args):
+            warnings.warn(f"Install Numba to get `{func.__name__}` " + \
+                   "function greatly accelerated")
+            return func(*args, **kw_args)
+        return func_wrp
 
 def tracksFromOPMD(ts, pt, ref_iteration,
                    fname='./tracks.h5',
@@ -338,7 +350,7 @@ def split_track_by_nans(x, y, z, ux, uy, uz, w):
 def record_particles_step(tracks, nsteps, it, it_start,
                           x, y, z, ux, uy, uz, id,
                           Np_select, dNp):
-    for ip in range(Np_select):
+    for ip in prange(Np_select):
         ip_glob = ip*dNp
 
         if np.isnan(x[ip_glob]):
@@ -360,7 +372,7 @@ def record_particles_step(tracks, nsteps, it, it_start,
 def record_particles_first(tracks, nsteps, it, it_start,
                            x, y, z, ux, uy, uz, id,
                            Np_select):
-    for ip in range(Np_select):
+    for ip in prange(Np_select):
 
         if np.isnan(x[ip]):
             continue
