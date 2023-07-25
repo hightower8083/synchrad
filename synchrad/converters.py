@@ -68,7 +68,7 @@ def tracksFromOPMD(ts, pt, ref_iteration,
     var_list = ['x', 'y', 'z', 'ux', 'uy', 'uz', 'w']
 
     TC['x'], TC['y'], TC['z'], TC['ux'], TC['uy'], TC['uz'], TC['w'] = \
-        ts.iterate(ts.get_particle, select=pt, var_list=var_list)
+        ts.iterate(ts.get_particle, select=pt, var_list=var_list, species=pt.species)
 
     # find and temporarily replace the non-consistent lists with NaNs
     for itLoc, valLoc in enumerate(TC['x']):
