@@ -34,7 +34,7 @@ A minimal example of **SynchRad** usage can be found in `example/` folder of thi
 Another common example would be to calculate radiation produced by the particles from, for example, a PIC simulation.
 In case if PIC software supports output in [OpenPMD standard](http://www.openpmd.org/#/start), this can be done with help of [openPMD-viewer](https://github.com/openPMD/openPMD-viewer), using the conversion function:
 ```python
-from opmd_viewer import OpenPMDTimeSeries, ParticleTracker
+from openpmd_viewer import OpenPMDTimeSeries, ParticleTracker
 from synchrad.utils import tracksFromOPMD
 
 ts = LpaDiagnostics('./run/diags_track/hdf5/', check_all_files=False)
