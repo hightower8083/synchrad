@@ -62,7 +62,7 @@ __kernel void total(
 
       if (it<nSteps-1)
       {
-        time = (${my_dtype})it * dt;
+        time = (${my_dtype})it_glob * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
         phase = omegaLocal * (time - dot(xLocal, nVec)) ;
@@ -169,7 +169,7 @@ __kernel void cartesian_comps(
 
       if (it<nSteps-1)
       {
-        time = (${my_dtype})it * dt;
+        time = (${my_dtype})it_glob * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
         phase = omegaLocal * (time - dot(xLocal, nVec)) ;
@@ -273,7 +273,7 @@ __kernel void cartesian_comps_complex(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
 
     ${my_dtype} dtInv = (${my_dtype})1. / dt;
-    ${my_dtype} wpdt =  wp * dt;
+    ${my_dtype} wpdt = ${f_native}sqrt(wp) * dt;
     ${my_dtype} phasePrev = (${my_dtype}) 0.;
     ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
     ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
@@ -290,7 +290,7 @@ __kernel void cartesian_comps_complex(
 
       if (it<nSteps-1)
       {
-        time = (${my_dtype})it * dt;
+        time = (${my_dtype})it_glob * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
         phase = omegaLocal * (time - dot(xLocal, nVec)) ;
@@ -408,7 +408,7 @@ __kernel void spheric_comps(
 
       if (it<nSteps-1)
       {
-        time = (${my_dtype})it * dt;
+        time = (${my_dtype})it_glob * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
         phase = omegaLocal * (time - dot(xLocal, nVec)) ;
@@ -520,7 +520,7 @@ __kernel void spheric_comps_complex(
     ${my_dtype} time, phase, dPhase, sinPhase, cosPhase, c1, c2, gammaInv;
 
     ${my_dtype} dtInv = (${my_dtype})1. / dt;
-    ${my_dtype} wpdt =  wp * dt;
+    ${my_dtype} wpdt =  ${f_native}sqrt(wp) * dt;
     ${my_dtype} phasePrev = (${my_dtype}) 0.;
     ${my_dtype}3 spectrLocalRe = (${my_dtype}3) {0., 0., 0.};
     ${my_dtype}3 spectrLocalIm = (${my_dtype}3) {0., 0., 0.};
@@ -537,7 +537,7 @@ __kernel void spheric_comps_complex(
 
       if (it<nSteps-1)
       {
-        time = (${my_dtype})it * dt;
+        time = (${my_dtype})it_glob * dt;
         xLocal = (${my_dtype}3) {x[it], y[it], z[it]};
 
         phase = omegaLocal * (time - dot(xLocal, nVec)) ;
