@@ -1,7 +1,8 @@
 import numpy as np
 import h5py
 import pyopencl as cl
-cl.create_some_context()
+#cl.create_some_context()
+# TODO: remove commented lines in this file
 import pyopencl.array as arrcl
 from mako.template import Template
 
@@ -85,8 +86,8 @@ class SynchRad(Utilities):
 
         if mpi_installed:
             self.comm = MPI.COMM_WORLD
-            self.rank = self.comm.rank
-            self.size = self.comm.size
+            self.rank = self.comm.Get_rank()
+            self.size = self.comm.Get_size()
         else:
             self.rank = 0
             self.size = 1
@@ -306,14 +307,14 @@ class SynchRad(Utilities):
         args_track = [coord.data for coord in (x, y, z, ux, uy, uz)]
         args_track += [wp, it_start, np.uint32(it_range[-1]), np.uint32(x.size)]
 
-        if self.Args['mode'] is 'far':
+        if self.Args['mode'] == 'far':
             axs_str = ('omega', 'sinTheta', 'cosTheta', 'sinPhi', 'cosPhi')
-        elif self.Args['mode'] is 'near':
+        elif self.Args['mode'] == 'near':
             axs_str = ('omega', 'radius', 'sinPhi', 'cosPhi')
 
         args_axes = [self.Data[name].data for name in axs_str]
 
-        if self.Args['mode'] is 'near':
+        if self.Args['mode'] == 'near':
             args_axes += [ self.dtype(self.Args['L_screen']), ]
 
         args_res = [np.uint32(Nn) for Nn in self.Args['gridNodeNums']]
@@ -321,14 +322,14 @@ class SynchRad(Utilities):
 
         args = args_track + args_axes + args_res + args_aux
 
-        if comp is 'total':
+        if comp == 'total':
             self._mapper.total(self.queue, (WGS_tot, ), (WGS, ),
                                spect['total'].data, *args)
-        elif comp is 'cartesian':
+        elif comp == 'cartesian':
             self._mapper.cartesian_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['x'].data, spect['y'].data, spect['z'].data, *args)
 
-        elif comp is 'cartesian_complex':
+        elif comp == 'cartesian_complex':
             arg_FormFactor = [self.Data['FormFactor'].data,]
             args += arg_FormFactor
             self._mapper.cartesian_comps_complex(
@@ -338,11 +339,11 @@ class SynchRad(Utilities):
                 spect['zre'].data, spect['zim'].data,
                 *args)
 
-        elif comp is 'spheric':
+        elif comp == 'spheric':
             self._mapper.spheric_comps(self.queue, (WGS_tot, ), (WGS, ),
                 spect['r'].data, spect['theta'].data, spect['phi'].data, *args)
 
-        elif comp is 'spheric_complex':
+        elif comp == 'spheric_complex':
             arg_FormFactor = [self.Data['FormFactor'].data,]
             args += arg_FormFactor
             self._mapper.spheric_comps_complex(
@@ -361,16 +362,16 @@ class SynchRad(Utilities):
         if 'dtype' not in self.Args:
             self.Args['dtype'] = 'double'
 
-        if self.Args['dtype'] is 'double':
+        if self.Args['dtype'] == 'double':
             self.dtype = np.double
-        elif self.Args['dtype'] is 'float':
+        elif self.Args['dtype'] == 'float':
             self.dtype = np.single
 
-        if self.Args['dtype'] is 'float':
-            if self.Args['mode'] is 'far':
+        if self.Args['dtype'] == 'float':
+            if self.Args['mode'] == 'far':
                 print ( 'WARNING: Chosen single precision should be ' + \
                         'used with care for the farfield calculations\n' )
-            elif self.Args['mode'] is 'near':
+            elif self.Args['mode'] == 'near':
                 print ( 'WARNING: Chosen single precision is not ' + \
                         'recommended for the nearfield calculations\n' )
 
@@ -487,14 +488,14 @@ class SynchRad(Utilities):
 
         self.Data = {}
 
-        if self.plat_name is "None":
+        if self.plat_name == "None":
             return
 
         # Note that dw is not multiplied by 2*pi
         self.Data['omega'] = arrcl.to_device( self.queue,
                                  self.dtype(2*np.pi) * self.Args['omega'] )
 
-        if self.Args['mode'] is 'far':
+        if self.Args['mode'] == 'far':
             self.Data['sinTheta'] = arrcl.to_device( self.queue,
                                                  np.sin(self.Args['theta']) )
             self.Data['cosTheta'] = arrcl.to_device( self.queue,
@@ -503,7 +504,7 @@ class SynchRad(Utilities):
                                                    np.sin(self.Args['phi']) )
             self.Data['cosPhi'] = arrcl.to_device( self.queue,
                                                    np.cos(self.Args['phi']) )
-        elif self.Args['mode'] is 'near':
+        elif self.Args['mode'] == 'near':
             self.Data['radius'] = arrcl.to_device( self.queue,
                                                    self.Args['radius'] )
             self.Data['sinPhi'] = arrcl.to_device( self.queue,
@@ -515,7 +516,7 @@ class SynchRad(Utilities):
         ctx_kw_args = {}
         if self.Args['ctx'] is None:
             ctx_kw_args['interactive'] = True
-        elif self.Args['ctx'] is 'mpi':
+        elif self.Args['ctx'] == 'mpi':
             # temporal definition, assumes default 0th platform
             ctx_kw_args['answers'] = [0, self.rank]
         elif self.Args['ctx'] is not False:
@@ -528,8 +529,19 @@ class SynchRad(Utilities):
             self.ocl_version = "None"
         else:
             try:
-                self.ctx = cl.create_some_context(**ctx_kw_args)
+                print(f"Creating context with args: {ctx_kw_args}")  # Logging
+
+                # Set up OpenCL context
+                platforms = cl.get_platforms()
+                gpus = platforms[0].get_devices(device_type=cl.device_type.GPU)
+
+                # Map MPI rank to a specific GPU
+                device = gpus[self.rank % len(gpus)]
+                self.ctx = cl.Context(devices=[device])
                 self.queue = cl.CommandQueue(self.ctx)
+
+                #self.ctx = cl.create_some_context(**ctx_kw_args)
+                #self.queue = cl.CommandQueue(self.ctx)
 
                 selected_dev = self.queue.device
                 self.dev_type = cl.device_type.to_string(selected_dev.type)
@@ -537,7 +549,9 @@ class SynchRad(Utilities):
 
                 self.plat_name = selected_dev.platform.vendor
                 self.ocl_version = selected_dev.opencl_c_version
-            except:
+                print(f"Context created successfully on device: {self.dev_name}")  # Logging
+            except Exception as e:
+                print(f"Failed to create context: {e}")  # Error logging
                 self.dev_type = "Starting without"
                 self.dev_name = ""
                 self.plat_name = "None"
@@ -604,7 +618,7 @@ class SynchRad(Utilities):
 
     def _compile_kernels(self):
 
-        if self.plat_name is "None":
+        if self.plat_name == "None":
             return
 
         agrs = {}
@@ -615,9 +629,9 @@ class SynchRad(Utilities):
             agrs['f_native'] = ''
 
         fname = src_path
-        if self.Args['mode'] is 'far':
+        if self.Args['mode'] == 'far':
             fname += "kernel_farfield.cl"
-        elif self.Args['mode'] is 'near':
+        elif self.Args['mode'] == 'near':
             fname += "kernel_nearfield.cl"
 
         src = Template( filename=fname ).render(**agrs)
