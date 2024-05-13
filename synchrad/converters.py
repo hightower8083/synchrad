@@ -21,6 +21,7 @@ def tracksFromOPMD(ts, pt, ref_iteration,
                    Np_select=None, dNp=1,
                    sample_selection='random',
                    Nit_min=None, Nit_max=None,
+                   z_is_xi=False,
                    shortest_track=8):
 
     species = pt.species
@@ -100,7 +101,10 @@ def tracksFromOPMD(ts, pt, ref_iteration,
             if nsteps > shortest_track:
                 f[f'tracks/{i_tr:d}/x'] = x
                 f[f'tracks/{i_tr:d}/y'] = y
-                f[f'tracks/{i_tr:d}/z'] = z
+                if z_is_xi:
+                    f[f'tracks/{i_tr:d}/z'] = z + c * t
+                else:
+                    f[f'tracks/{i_tr:d}/z'] = z
                 f[f'tracks/{i_tr:d}/ux'] = ux
                 f[f'tracks/{i_tr:d}/uy'] = uy
                 f[f'tracks/{i_tr:d}/uz'] = uz

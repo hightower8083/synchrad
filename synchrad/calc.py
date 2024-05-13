@@ -144,26 +144,27 @@ class SynchRad(Utilities):
               'cartesian_complex': record Cartesian components coherently:
                 `SUM_tracks(A_x), SUM_tracks(A_y), SUM_tracks(A_z)`
 
-        sigma_particle : double (optional) Define size of the particle 
-            in distance units using Gaussian form factor
+        sigma_particle : double (optional) 
+            Define size of the particle in distance units with Gaussian form-factor
 
-        weights_normalize : string or None (optional) Reset the particle 
-            weights with some normalization (needed for coherency 
-            effects with macroparticles). Can be 'mean', 'max' or 'ones' 
+        weights_normalize : string or None (optional)
+            Reset the particle weights with some normalization (needed for the 
+            coherency effects with macroparticles). Can be 'mean', 'max' or 'ones' 
             to normalize weights with a mean or max weight (over all 
             tracks) or set them to ones respectively.
 
         Np_max : integer
             Define a number of tracks to use in calculation
 
-        nSnaps : integer (optional) Number of records to make along the 
-            interaction time with uniform intervals
+        nSnaps : integer (optional)
+            Number of records to make along the interaction time with uniform intervals
 
         it_range :
             Specify the range of iterations to consider along the interaction
 
-        file_spectrum : string Path and name to the file to which write 
-            the radiation data along with the simulation configuration
+        file_spectrum : string
+            Path and name to the file to which write the radiation data along with 
+            the simulation configuration
         """
 
         self.Args['sigma_particle'] = self.dtype(sigma_particle)
