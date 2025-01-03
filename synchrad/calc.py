@@ -525,7 +525,8 @@ class SynchRad(Utilities):
 
                 # Set up OpenCL context
                 platforms = cl.get_platforms()
-                gpus = platforms[0].get_devices(device_type=cl.device_type.GPU)
+                gpus = platforms[0].get_devices(device_type=cl.device_type.ALL)
+                #gpus = platforms[0].get_devices(device_type=cl.device_type.GPU)
 
                 # Map MPI rank to a specific GPU
                 device = gpus[self.rank % len(gpus)]
