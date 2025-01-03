@@ -1,5 +1,4 @@
 import numpy as np
-import h5py
 from synchrad.calc import SynchRad
 
 if __name__ == "__main__":

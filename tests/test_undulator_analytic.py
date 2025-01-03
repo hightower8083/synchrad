@@ -2,7 +2,7 @@ import numpy as np
 
 from synchrad.calc import SynchRad
 from synchrad.utils import J_in_um
-import sys, time
+import time
 
 # Undulator
 K0 = 0.1  # Strength

@@ -24,7 +24,6 @@ def tracksFromOPMD(ts, pt, ref_iteration,
                    z_is_xi=False,
                    shortest_track=8):
 
-    species = pt.species
     all_pid = pt.selected_pid.copy()
 
     if Np_select is not None:
@@ -102,7 +101,8 @@ def tracksFromOPMD(ts, pt, ref_iteration,
                 f[f'tracks/{i_tr:d}/x'] = x
                 f[f'tracks/{i_tr:d}/y'] = y
                 if z_is_xi:
-                    f[f'tracks/{i_tr:d}/z'] = z + c * t[it_start:it_start+z.size] # Since the size of z may have changed, we need to truncate t accordingly
+                    # Since the size of z may have changed, we need to truncate t accordingly
+                    f[f'tracks/{i_tr:d}/z'] = z + c * t[it_start:it_start+z.size]
                 else:
                     f[f'tracks/{i_tr:d}/z'] = z
                 f[f'tracks/{i_tr:d}/ux'] = ux
@@ -237,7 +237,6 @@ def tracksFromVSIM(file_vsim, file_synchrad,
     f_trk_synch = h5py.File(file_synchrad, mode='w')
 
     Nt, Np, _ = f_trk_orig['tracks'].shape
-    data_fields = f_trk_orig.keys()
 
     # unless there's any useful data
     w0 = 1.0
