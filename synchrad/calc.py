@@ -514,7 +514,7 @@ class SynchRad(Utilities):
                                                    np.sin(self.Args['phi']) )
             self.Data['cosPhi'] = arrcl.to_device( self.queue,
                                                    np.cos(self.Args['phi']) )
-    def _init_comm(self, verbose=False):
+    def _init_comm(self, verbose=True):
 
         ctx_kw_args = {}
 
