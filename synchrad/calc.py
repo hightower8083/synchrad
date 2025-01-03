@@ -69,12 +69,11 @@ class SynchRad(Utilities):
             can be set to "`single`" (be careful with that though).
 
         ctx: string (optional)
-            Define of openCL context. If not provided will provide this
-            choice interactively (or take default if only one is available).
-            Possible choices are:
-            'none': initialized without any device
-            'mpi': use platform `0` and map multiple avaliable devices vie MPI
-            list of choices for platform and device [PlatformID, DeviceID]
+            Define of openCL context. If not provided (None) will automatically choose
+            the first device of 0th platform, or will consider MPI is run with `mpirun`.
+            Possible other choices are:
+              'interactive': initialized interactivelly
+              False: no device (e.g. init from the file for post-processing)
 
         Features: list of strings (optional)
             Additional features. Currently has following options:
@@ -532,9 +531,6 @@ class SynchRad(Utilities):
                 device = gpus[self.rank % len(gpus)]
                 self.ctx = cl.Context(devices=[device])
                 self.queue = cl.CommandQueue(self.ctx)
-
-                #self.ctx = cl.create_some_context(**ctx_kw_args)
-                #self.queue = cl.CommandQueue(self.ctx)
 
                 selected_dev = self.queue.device
                 self.dev_type = cl.device_type.to_string(selected_dev.type)
