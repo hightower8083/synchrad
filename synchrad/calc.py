@@ -533,6 +533,9 @@ class SynchRad(Utilities):
                 self.ctx = cl.Context(devices=[device])
                 self.queue = cl.CommandQueue(self.ctx)
 
+                #self.ctx = cl.create_some_context(**ctx_kw_args)
+                #self.queue = cl.CommandQueue(self.ctx)
+
                 selected_dev = self.queue.device
                 self.dev_type = cl.device_type.to_string(selected_dev.type)
                 self.dev_name = self.queue.device.name
@@ -544,6 +547,7 @@ class SynchRad(Utilities):
             except Exception as e:
                 if verbose:
                     print(f"Failed to create context: {e}")
+
                 self.dev_type = "Starting without"
                 self.dev_name = ""
                 self.plat_name = "None"
