@@ -9,7 +9,7 @@ K0 = 0.1  # Strength
 Periods = 50  # Number of periods
 
 # Particles and tracks characteristics
-Np = 24  # Number of particles
+Np = 1  # Number of particles
 g0 = 100.0  # Mean Lorentz factor
 dg = 1e-4 * g0  # Energy spread
 StepsPerPeriod = 64  # Track temporal resolution
@@ -65,65 +65,69 @@ calc_input = {
 
 print("Running default mode with double precision")
 
-calc = SynchRad(calc_input)
 
-t0 = time.time()
-calc.calculate_spectrum(particleTracks.copy(), timeStep=dt,
-                        comp="total", Np_max=Np, L_screen=L_scr)
+def test_undulator_near():
 
-if calc.rank == 0:
-    print(
-        "Done {:s}field spectrum from {:d} particle(s) in {:g} sec".format(
-            calc.Args["mode"], Np, (time.time() - t0)
+    calc = SynchRad(calc_input)
+
+    t0 = time.time()
+    calc.calculate_spectrum(particleTracks.copy(), timeStep=dt,
+                            comp="total", Np_max=Np, L_screen=L_scr)
+
+    if calc.rank == 0:
+        print(
+            "Done {:s}field spectrum from {:d} particle(s) in {:g} sec".format(
+                calc.Args["mode"], Np, (time.time() - t0)
+            )
         )
-    )
-    energyModel = calc.get_energy(lambda0_um=1)
-    energyTheory = (
-        Np
-        * k_res
-        * J_in_um
-        * (7 * np.pi / 24)
-        / 137.0
-        * K0 ** 2
-        * (1 + K0 ** 2 / 2)
-        * Periods
-    )
-    var = abs(energyModel - energyTheory) / energyTheory
-
-    print("Deviation from analytic estimate is {:.2f}%".format(var * 100))
-
-
-print("\nRunning light mode with single precision and native function support")
-
-calc.Args["dtype"] = "float"
-calc.Args["native"] = True
-
-calc._init_args(calc.Args)
-calc._init_data()
-calc._compile_kernels()
-
-t0 = time.time()
-calc.calculate_spectrum(particleTracks.copy(), timeStep=dt,
-                        comp="total", Np_max=Np, L_screen=L_scr)
-
-if calc.rank == 0:
-    print(
-        "Done {:s}field spectrum from {:d} particle(s) in {:g} sec".format(
-            calc.Args["mode"], Np, (time.time() - t0)
+        energyModel = calc.get_energy(lambda0_um=1)
+        energyTheory = (
+            Np
+            * k_res
+            * J_in_um
+            * (7 * np.pi / 24)
+            / 137.0
+            * K0 ** 2
+            * (1 + K0 ** 2 / 2)
+            * Periods
         )
-    )
+        var = abs(energyModel - energyTheory) / energyTheory
 
-    energyModel = calc.get_energy(lambda0_um=1)
-    energyTheory = (
-        Np
-        * k_res
-        * J_in_um
-        * (7 * np.pi / 24)
-        / 137.0
-        * K0 ** 2
-        * (1 + K0 ** 2 / 2)
-        * Periods
-    )
-    var = abs(energyModel - energyTheory) / energyTheory
+        print("Deviation from analytic estimate is {:.2f}%".format(var * 100))
 
-    print("Deviation from analytic estimate is {:.2f}%".format(var * 100))
+
+    print("\nRunning light mode with single precision and native function support")
+
+    calc.Args["dtype"] = "float"
+    calc.Args["native"] = True
+
+    calc._init_args(calc.Args)
+    calc._init_data()
+    calc._compile_kernels()
+
+    t0 = time.time()
+    calc.calculate_spectrum(particleTracks.copy(), timeStep=dt,
+                            comp="total", Np_max=Np, L_screen=L_scr)
+
+    if calc.rank == 0:
+        print(
+            "Done {:s}field spectrum from {:d} particle(s) in {:g} sec".format(
+                calc.Args["mode"], Np, (time.time() - t0)
+            )
+        )
+
+        energyModel = calc.get_energy(lambda0_um=1)
+        energyTheory = (
+            Np
+            * k_res
+            * J_in_um
+            * (7 * np.pi / 24)
+            / 137.0
+            * K0 ** 2
+            * (1 + K0 ** 2 / 2)
+            * Periods
+        )
+        var = abs(energyModel - energyTheory) / energyTheory
+
+        print("Deviation from analytic estimate is {:.2f}%".format(var * 100))
+

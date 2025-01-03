@@ -78,9 +78,9 @@ class SynchRad(Utilities):
 
         Features: list of strings (optional)
             Additional features. Currently has following options:
-              'wavelengthGrid': make frequency axis with uniform 
-                wavelength intervals 
-              'logGrid': make frequency axis with intervals growing 
+              'wavelengthGrid': make frequency axis with uniform
+                wavelength intervals
+              'logGrid': make frequency axis with intervals growing
                 logarithmically
         """
 
@@ -91,6 +91,7 @@ class SynchRad(Utilities):
         else:
             self.rank = 0
             self.size = 1
+
         if file_spectrum is None:
             self._init_args(Args)
             self._init_comm()
@@ -138,19 +139,19 @@ class SynchRad(Utilities):
                 `SUM_tracks( |A_x|^2 + |A_y|^2 + |A_z|^2)`
               'cartesian': record Cartesian components incoherently:
                 `SUM_tracks(|A_x|^2), SUM_tracks(|A_y|^2), SUM_tracks(|A_z|^2)`
-              'spheric': record spheric components incoherently 
-                (far-field only): `SUM_tracks(|A_r|^2), 
+              'spheric': record spheric components incoherently
+                (far-field only): `SUM_tracks(|A_r|^2),
                 SUM_tracks(|A_theta|^2), SUM_tracks(|A_phi|^2)`
               'cartesian_complex': record Cartesian components coherently:
                 `SUM_tracks(A_x), SUM_tracks(A_y), SUM_tracks(A_z)`
 
-        sigma_particle : double (optional) 
+        sigma_particle : double (optional)
             Define size of the particle in distance units with Gaussian form-factor
 
         weights_normalize : string or None (optional)
-            Reset the particle weights with some normalization (needed for the 
-            coherency effects with macroparticles). Can be 'mean', 'max' or 'ones' 
-            to normalize weights with a mean or max weight (over all 
+            Reset the particle weights with some normalization (needed for the
+            coherency effects with macroparticles). Can be 'mean', 'max' or 'ones'
+            to normalize weights with a mean or max weight (over all
             tracks) or set them to ones respectively.
 
         Np_max : integer
@@ -163,7 +164,7 @@ class SynchRad(Utilities):
             Specify the range of iterations to consider along the interaction
 
         file_spectrum : string
-            Path and name to the file to which write the radiation data along with 
+            Path and name to the file to which write the radiation data along with
             the simulation configuration
         """
 
@@ -194,6 +195,7 @@ class SynchRad(Utilities):
                 if 'it_range' in f_tracks['misc'].keys():
                     it_range = tuple(f_tracks['misc/it_range'][()])
                     self._set_snap_iterations(it_range, nSnaps)
+
                     if self.rank==0 and verbose:
                         print("it_range from the input file will be used")
                 else:
@@ -215,8 +217,10 @@ class SynchRad(Utilities):
             for ip in part_ind:
                 track = [f_tracks[f"tracks/{ip:d}/{cmp}"][()] for cmp in cmps]
                 particleTracks.append(track)
+
             if self.rank==0 and verbose:
                 print("Tracks are loaded")
+
             f_tracks.close()
 
         # input from a list
@@ -511,25 +515,14 @@ class SynchRad(Utilities):
                                                    np.sin(self.Args['phi']) )
             self.Data['cosPhi'] = arrcl.to_device( self.queue,
                                                    np.cos(self.Args['phi']) )
-    def _init_comm(self):
+    def _init_comm(self, verbose=False):
 
         ctx_kw_args = {}
-        if self.Args['ctx'] is None:
-            ctx_kw_args['interactive'] = True
-        elif self.Args['ctx'] == 'mpi':
-            # temporal definition, assumes default 0th platform
-            ctx_kw_args['answers'] = [0, self.rank]
-        elif self.Args['ctx'] is not False:
-            ctx_kw_args['answers'] = self.Args['ctx']
 
-        if self.Args['ctx'] is False:
-            self.dev_type = "Starting without"
-            self.dev_name = ""
-            self.plat_name = "None"
-            self.ocl_version = "None"
-        else:
+        if self.Args['ctx'] is None:
             try:
-                print(f"Creating context with args: {ctx_kw_args}")  # Logging
+                if verbose:
+                    print(f"Creating context with args: {ctx_kw_args}")
 
                 # Set up OpenCL context
                 platforms = cl.get_platforms()
@@ -540,24 +533,41 @@ class SynchRad(Utilities):
                 self.ctx = cl.Context(devices=[device])
                 self.queue = cl.CommandQueue(self.ctx)
 
-                #self.ctx = cl.create_some_context(**ctx_kw_args)
-                #self.queue = cl.CommandQueue(self.ctx)
-
                 selected_dev = self.queue.device
                 self.dev_type = cl.device_type.to_string(selected_dev.type)
                 self.dev_name = self.queue.device.name
 
                 self.plat_name = selected_dev.platform.vendor
                 self.ocl_version = selected_dev.opencl_c_version
-                print(f"Context created successfully on device: {self.dev_name}")  # Logging
+                if verbose:
+                    print(f"Context created successfully on device: {self.dev_name}")
             except Exception as e:
-                print(f"Failed to create context: {e}")  # Error logging
+                if verbose:
+                    print(f"Failed to create context: {e}")
                 self.dev_type = "Starting without"
                 self.dev_name = ""
                 self.plat_name = "None"
                 self.ocl_version = "None"
+        elif self.Args['ctx']=='interactive':
+            self.ctx = cl.create_some_context(interactive=True)
+            self.queue = cl.CommandQueue(self.ctx)
+
+            selected_dev = self.queue.device
+            self.dev_type = cl.device_type.to_string(selected_dev.type)
+            self.dev_name = self.queue.device.name
+
+            self.plat_name = selected_dev.platform.vendor
+            self.ocl_version = selected_dev.opencl_c_version
+            if verbose:
+                print(f"Context created successfully on device: {self.dev_name}")
+        elif self.Args['ctx'] is False:
+            self.dev_type = "Starting without"
+            self.dev_name = ""
+            self.plat_name = "None"
+            self.ocl_version = "None"
 
         msg = "  {} device: {}".format(self.dev_type, self.dev_name)
+
         if self.size>1:
             msg = self.comm.gather(msg)
         else:
@@ -623,12 +633,14 @@ class SynchRad(Utilities):
 
         agrs = {}
         agrs['my_dtype'] = self.Args['dtype']
+
         if 'native' in self.Args:
             agrs['f_native'] = 'native_'
         else:
             agrs['f_native'] = ''
 
         fname = src_path
+
         if self.Args['mode'] == 'far':
             fname += "kernel_farfield.cl"
         elif self.Args['mode'] == 'near':
