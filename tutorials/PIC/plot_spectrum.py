@@ -53,11 +53,6 @@ if __name__ == "__main__":
 
     calc = SynchRad(file_spectrum="spectrum.h5")
 
-#    with h5py.File("spectrum.h5", "r") as f:
-#        calc.Data["radiation"] = {}
-#        for key in f["radiation"].keys():
-#            calc.Data["radiation"][key] = f[f"radiation/{key}"][...] / total_particle_weight
-
     # compute total emitted energy
     E_cutoff = 1.0  # keV
     eph_keV_m = 1.24e-9
@@ -68,21 +63,21 @@ if __name__ == "__main__":
     spect_filter = (energy_axis_full > E_cutoff)[:, np.newaxis, np.newaxis]
 
     energy_tot = calc.get_energy(
-        lambda0_um=1e6, phot_num=False, spect_filter=spect_filter
+        lambda0_um=1e6, spect_filter=spect_filter
     )
     energy_per_C = energy_tot/(e*calc.total_weight)
     print(f"Total energy emitted in >{E_cutoff:g} keV: {energy_per_C:g} J/C")
 
     # plot energy spectrum
     pyplot.figure()
-    energy_spectrum1D = calc.get_energy_spectrum(lambda0_um=1e6)
-    pyplot.semilogx(energy_axis, energy_spectrum1D)
+    energy_spectrum1D = calc.get_energy_spectrum()
+    pyplot.semilogx(energy_axis, energy_spectrum1D * 1e-3) # 1e-3 is for 0.1% units
     pyplot.xlabel("Photon energy (keV)")
     pyplot.ylabel("Brightness (ph./0.1%b.w./e$^-$)")
     pyplot.savefig("energy_spectrum_1D.png")
 
     # plot real-space emission
-    spotXY_far, ext_far = calc.get_spot_cartesian(bins=(512, 512), lambda0_um=1.0)
+    spotXY_far, ext_far = calc.get_spot_cartesian(bins=(512, 512), lambda0_um=1e6)
 
     fig = pyplot.figure(figsize=(8, 8))
     Plot2D(
