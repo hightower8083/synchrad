@@ -5,6 +5,8 @@ from scipy.constants import alpha as alpha_fs
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter
 
+from .converters import tracksFromOPMD
+
 try:
     from tvtk.api import tvtk, write_data
     tvtk_installed = True
