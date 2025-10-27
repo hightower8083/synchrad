@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     # plot energy spectrum
     pyplot.figure()
-    energy_spectrum1D = calc.get_energy_spectrum()
+    energy_spectrum1D = calc.get_energy_spectrum(normalize_to_weights=True)
     pyplot.semilogx(energy_axis, energy_spectrum1D * 1e-3) # 1e-3 is for 0.1% units
     pyplot.xlabel("Photon energy (keV)")
     pyplot.ylabel("Brightness (ph./0.1%b.w./e$^-$)")
