@@ -16,6 +16,16 @@ except Exception:
             return func(*args, **kw_args)
         return func_wrp
 
+# try import tqdm and make dummy methods if cannot
+try:
+    from tqdm.auto import tqdm
+except Exception:
+    def tqdm(func):
+        def func_wrp(*args, **kw_args):
+            return func(*args, **kw_args)
+        return func_wrp
+
+
 def tracksFromOPMD(ts, pt, ref_iteration,
                    fname='./tracks.h5',
                    Np_select=None, dNp=1,
@@ -67,6 +77,7 @@ def tracksFromOPMD(ts, pt, ref_iteration,
     TC = {}
     var_list = ['x', 'y', 'z', 'ux', 'uy', 'uz', 'w']
 
+    print ('Reading time steps from openPMD data')
     TC['x'], TC['y'], TC['z'], TC['ux'], TC['uy'], TC['uz'], TC['w'] = \
         ts.iterate(ts.get_particle, select=pt, var_list=var_list, species=pt.species)
 
@@ -89,7 +100,8 @@ def tracksFromOPMD(ts, pt, ref_iteration,
     it_end_global = 0
     f = h5py.File(fname, mode='w')
 
-    for ip in range(pt.N_selected):
+    print ('Processing tracks and writing data')
+    for ip in tqdm(range(pt.N_selected)):
         track_pieces = split_track_by_nans(
                 TC['x'][ip], TC['y'][ip], TC['z'][ip],
                 TC['ux'][ip], TC['uy'][ip], TC['uz'][ip], TC['w'][ip])
