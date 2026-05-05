@@ -60,13 +60,14 @@ def tracksFromOPMD(ts, pt, ref_iteration,
 
     iterations = ts.iterations.copy()
     t = ts.t.copy()
-    iteration_ind = np.arange(iterations.size, dtype=np.int64)
 
+    # Build the iteration window from a single combined boolean mask.
+    iteration_mask = np.ones(iterations.size, dtype=bool)
     if Nit_min is not None:
-        iteration_ind = iteration_ind[iterations>=Nit_min]
-
+        iteration_mask &= (iterations >= Nit_min)
     if Nit_max is not None:
-        iteration_ind = iteration_ind[iterations<=Nit_max]
+        iteration_mask &= (iterations <= Nit_max)
+    iteration_ind = np.where(iteration_mask)[0]
 
     iterations = iterations[iteration_ind]
     t = t[iteration_ind]
@@ -91,9 +92,13 @@ def tracksFromOPMD(ts, pt, ref_iteration,
     for var in var_list:
         TC[var] = np.array(TC[var], order='F').T
 
-    # temporal patch to select iterations -- should go ts.iterate
-    #for var in var_list:
-    #    TC[var] = TC[var][:, iteration_ind]
+    # `ts.iterate` above walks the FULL `ts.iterations`, so each TC[var]
+    # comes back with shape (N_selected, ts.iterations.size).  When an
+    # Nit_min/Nit_max window was requested, slice down to that window so
+    # downstream `it_start` indexing matches `iterations`/`t` above.
+    if Nit_min is not None or Nit_max is not None:
+        for var in var_list:
+            TC[var] = TC[var][:, iteration_ind]
 
     i_tr = 0
     it_start_global = np.inf
