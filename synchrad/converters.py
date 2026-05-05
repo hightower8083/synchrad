@@ -62,13 +62,6 @@ def tracksFromOPMD(ts, pt, ref_iteration,
     t = ts.t.copy()
 
     # Build the iteration window from a single combined boolean mask.
-    # The previous chained-filter form
-    #     iteration_ind = np.arange(iterations.size)
-    #     iteration_ind = iteration_ind[iterations>=Nit_min]   # shrinks
-    #     iteration_ind = iteration_ind[iterations<=Nit_max]   # IndexError
-    # IndexError'd whenever both Nit_min and Nit_max were given: the
-    # second filter applied a full-length boolean mask to the already
-    # shrunken iteration_ind.
     iteration_mask = np.ones(iterations.size, dtype=bool)
     if Nit_min is not None:
         iteration_mask &= (iterations >= Nit_min)
